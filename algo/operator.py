@@ -27,7 +27,7 @@ from itertools import chain
 import pickle
 import datetime
 from collections import defaultdict
-import dynamic_window_determination_user_profile as dwdup
+from . import dynamic_window_determination_user_profile as dwdup
 
 class Operator(util.OperatorBase):
     def __init__(self, device_id, data_path, device_name='das Gerät'):
