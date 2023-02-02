@@ -40,8 +40,9 @@ def compute_time_window_consumptions(list_of_time_windows):
 def window_determination(data_series):
     grouped_five_min = create_daily_five_min_groups(data_series)
     # Each object in the list grouped_five_min contains the data from data_series from a single day grouped into slots of five minutes.
+    grouped_five_min_list = [[group[1] for group in day] for day in grouped_five_min]
     
-    consumption_series_list_five_min =  compute_five_min_consumptions(grouped_five_min)                                    
+    consumption_series_list_five_min =  compute_time_window_consumptions(grouped_five_min_list)                                    
     # Each object in the list consumption_series_list_five_min contains a pandas series in which for a single day the consumption within the 5-minutes time slots is stored.
     # I.e. eech pandas series in this list has 24*(60/5)=24*12=288 entries if the data is clean. The series with less entries get ignored.
 
@@ -69,7 +70,7 @@ def window_determination(data_series):
 
     # We use these information now to divide the time line into windows (we add the start and the end of the day to the list, i.e. 0 and 287).
 
-    window_boundaries_points = sorted(list(set([0]+list(properties_mean['left_bases'])+list(properties_mean['right_bases'])+[287])))
+    window_boundaries_points = sorted(list(set([0]+list(properties_mean['left_bases'])+list(properties_mean['right_bases']))))
 
     # Now we check if boundary point are too close together (i.e. closer than 0.5 hour):
 
@@ -85,9 +86,28 @@ def window_determination(data_series):
 
     window_boundaries_times = [(pd.Timestamp.now().floor('d')+i*pd.Timedelta('5T')).time() for i in window_boundaries_points]
 
-    # As a last step we replace the timesampt from 23:55 to 23:59:59:999999
+    # Next we replace the timestamp from 23:55 to 23:59:59:999999
 
     window_boundaries_times[-1] = (pd.Timestamp.now().floor('d')-pd.Timedelta('1ns')).time()
+
+    # As a last step we check if the time windows are too long. (Threshold is 2 hours)
+
+    new_window_boundary_times = []
+    for i, time in enumerate(window_boundaries_times[:-1]):
+        if pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)) >= pd.Timedelta(2,'h'):
+            num_additional_slots = math.ceil((pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)))/pd.Timedelta(2,'h'))
+            len_new_slots = (pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)))/num_additional_slots
+            additional_slots = []
+            for i in range(1,num_additional_slots):
+                additional_slots.append((pd.Timestamp(str(time))+i*len_new_slots).time())
+            aux = window_boundaries_times.copy()
+            aux[i+1:i+1] = additional_slots
+            new_window_boundary_times += aux
+
+    window_boundaries_times = sorted(list(set(new_window_boundary_times))) 
+            
+
+
 
     return window_boundaries_times
 
