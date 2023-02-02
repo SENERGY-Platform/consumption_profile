@@ -118,11 +118,11 @@ class Operator(util.OperatorBase):
             return epsilon
 
     def create_clustering(self, epsilon):
-        self.time_window_consumption_clustering[str(self.last_time_window_start)] = DBSCAN(eps=epsilon, min_samples=7).fit(np.array([time_window_consumption 
-                                                                     for _, time_window_consumption in self.time_window_consumption_list_dict[str(self.last_time_window_start)]]).reshape(-1,1))
+        self.time_window_consumption_clustering[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'] = DBSCAN(eps=epsilon, min_samples=7).fit(np.array([time_window_consumption 
+                                                                     for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']]).reshape(-1,1))
         with open(self.clustering_file_path, 'wb') as f:
             pickle.dump(self.time_window_consumption_clustering, f)
-        return self.time_window_consumption_clustering[str(self.last_time_window_start)].labels_
+        return self.time_window_consumption_clustering[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].labels_
     
     def test_time_window_consumption(self, clustering_labels):
         anomalous_indices = np.where(clustering_labels==-1)[0]
