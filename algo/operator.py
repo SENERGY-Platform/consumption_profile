@@ -140,8 +140,9 @@ class Operator(util.OperatorBase):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
-        if self.timestamp.day%7==0 and self.current_time_window_start.day<self.timestamp.day:
-            self.update_time_window_data()
+        if self.timestamp.day%14==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
+            if self.data_history.index[-2].date()<self.timestamp.date():
+                self.update_time_window_data()
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
@@ -153,7 +154,7 @@ class Operator(util.OperatorBase):
                 return
             else:
                 self.update_time_window_consumption_list_dict()
-                if len(self.time_window_consumption_list_dict[str(self.last_time_window_start)]) >= 24:
+                if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']) >= 10:
                     epsilon = self.determine_epsilon()
                     clustering_labels = self.create_clustering(epsilon)
                     days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
@@ -161,7 +162,7 @@ class Operator(util.OperatorBase):
                     if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
                         return {'value': f'Nachricht vom {str(self.timestamp.date())} um {str(self.timestamp.hour)}:{str(self.timestamp.minute)} Uhr: Im letzten Zeitfenster wurde durch {self.device_name} ungewöhnlich wenig verbraucht.'} 
                     else:
-                        return  
+                        return 
                 else:
-                    self.consumption_same_time_window = [data]
-                    return
+                    self.consumption_same_time_window = [data] 
+                    return 
