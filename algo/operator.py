@@ -96,7 +96,8 @@ class Operator(util.OperatorBase):
         time_window_consumption_max = float(self.consumption_same_time_window[max_index]['Consumption'])
         time_window_consumption_min = float(self.consumption_same_time_window[min_index]['Consumption'])
         overall_time_window_consumption = 1000*(time_window_consumption_max-time_window_consumption_min)
-        self.time_window_consumption_list_dict[str(self.last_time_window_start)].append((self.timestamp, overall_time_window_consumption))
+        if np.isnan(overall_time_window_consumption)==False:
+            self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.timestamp, overall_time_window_consumption))
         with open(self.time_window_consumption_list_dict_file_path, 'wb') as f:
             pickle.dump(self.time_window_consumption_list_dict, f)
         return
