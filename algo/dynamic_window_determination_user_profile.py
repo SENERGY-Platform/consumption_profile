@@ -7,7 +7,7 @@ The other input is a pandas timedelta object that depicts the minimum time windo
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-from scipy.signal import savgol_filter, find_peaks, peak_widths
+from scipy.signal import savgol_filter, find_peaks
 import math
 
 def create_daily_five_min_groups(data_series):
