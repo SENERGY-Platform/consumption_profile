@@ -25,11 +25,9 @@ def compute_time_window_consumptions(list_of_time_windows):
     for day in list_of_time_windows:
         time_window_data = []
         for window in day:
-            try:
-                time_window_data.append(window.iloc[-1]-window.iloc[0])
-            except:
-                time_window_data.append(0)
-        consumption_series_list_time_window.append(pd.Series(data=time_window_data, index=[window.index[0] for window in day]))
+            if list(window)!=[]:
+                time_window_data.append(1000*(window.iloc[-1]-window.iloc[0]))
+        consumption_series_list_time_window.append(pd.Series(data=time_window_data, index=[window.index[0].floor('5T') for window in day if list(window)!=[]]))
 
     for i, series in reversed(list(enumerate(consumption_series_list_time_window))):
         if len(series) != 288:
