@@ -126,15 +126,15 @@ class Operator(util.OperatorBase):
     
     def test_time_window_consumption(self, clustering_labels):
         anomalous_indices = np.where(clustering_labels==-1)[0]
-        quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[str(self.last_time_window_start)]],0.005)
-        anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[str(self.last_time_window_start)][i][1] < quantile]
-        if len(self.time_window_consumption_list_dict[str(self.last_time_window_start)])-1 in anomalous_indices_low:
+        quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']],0.2)
+        anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][i][1] < quantile]
+        if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'])-1 in anomalous_indices_low:
             print(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
-            self.time_window_consumption_list_dict_anomalies[str(self.last_time_window_start)].append(self.time_window_consumption_list_dict[str(self.last_time_window_start)][-1])
+            self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1])
         with open(self.time_window_consumption_list_dict_anomaly_file_path, 'wb') as f:
             pickle.dump(self.time_window_consumption_list_dict_anomalies,f)
 
-        return [self.time_window_consumption_list_dict[str(self.last_time_window_start)][i] for i in anomalous_indices_low]
+        return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][i] for i in anomalous_indices_low]
     
     def run(self, data, selector='energy_func'):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
