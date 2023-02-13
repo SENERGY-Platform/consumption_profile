@@ -40,6 +40,7 @@ class Operator(util.OperatorBase):
         self.time_window_consumption_list_dict_anomalies = defaultdict(list)
         self.data_history = pd.Series([], index=[],dtype=object)
 
+
         self.window_boundaries_times =  [datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0), 
                                          datetime.time(18, 0), datetime.time(21, 0), datetime.time(23, 59, 59, 999999)]
                                       
@@ -102,6 +103,21 @@ class Operator(util.OperatorBase):
             pickle.dump(self.time_window_consumption_list_dict, f)
         return
 
+    def update_quantile_check_list(self):
+        quantile_check_list = []
+        for i in range(14):
+            quantile_check_list.append(self.data_history[(self.timestamp-pd.Timedelta(2,'h'))-i*pd.Timedelta(1,'d'):self.timestamp-i*pd.Timedelta(1,'d')])
+        return quantile_check_list
+
+    def do_quantile_check(self, quantile_check_list):
+        quantile_check_consumption_list = [data[-1]-data[0] for data in quantile_check_list]
+        quantile = np.quantile(quantile_check_consumption_list,0.05)
+        if quantile_check_consumption_list[0] <= quantile:
+            return 1
+        else:
+            return 0
+
+
     def determine_epsilon(self):
         neighbors = NearestNeighbors(n_neighbors=10)
         neighbors_fit = neighbors.fit(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']]).reshape(-1,1))
@@ -126,7 +142,7 @@ class Operator(util.OperatorBase):
     
     def test_time_window_consumption(self, clustering_labels):
         anomalous_indices = np.where(clustering_labels==-1)[0]
-        quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']],0.2)
+        quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']],0.05)
         anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][i][1] < quantile]
         if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'])-1 in anomalous_indices_low:
             print(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
@@ -140,18 +156,20 @@ class Operator(util.OperatorBase):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
+        quantile_check_list = self.update_quantile_check_list()
+        quantile_check = self.do_quantile_check(quantile_check_list)
         if self.timestamp.day%14==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
             if self.data_history.index[-2].date()<self.timestamp.date():
                 self.update_time_window_data()
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
-            return
+            return {'value': 0, 'quantile_check': quantile_check}
         elif self.consumption_same_time_window != []:
             self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
-                return
+                return {'value': 0, 'quantile_check': quantile_check}
             else:
                 self.update_time_window_consumption_list_dict()
                 if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']) >= 10:
@@ -160,9 +178,9 @@ class Operator(util.OperatorBase):
                     days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
                     self.consumption_same_time_window = [data]                 
                     if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
-                        return {'value': f'Nachricht vom {str(self.timestamp.date())} um {str(self.timestamp.hour)}:{str(self.timestamp.minute)} Uhr: Im letzten Zeitfenster wurde durch {self.device_name} ungewöhnlich wenig verbraucht.'} 
+                        return {'value': 1, 'quantile_check': quantile_check} 
                     else:
-                        return 
+                        return {'value': 0, 'quantile_check': quantile_check}
                 else:
                     self.consumption_same_time_window = [data] 
-                    return 
+                    return {'value': 0, 'quantile_check': quantile_check}
