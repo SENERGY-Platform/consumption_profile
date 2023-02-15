@@ -106,7 +106,7 @@ class Operator(util.OperatorBase):
     def update_quantile_check_list(self):
         quantile_check_list = []
         for i in range(14):
-            quantile_check_list.append(self.data_history[(self.timestamp-pd.Timedelta(2,'h'))-i*pd.Timedelta(1,'d'):self.timestamp-i*pd.Timedelta(1,'d')])
+            quantile_check_list.append(self.data_history[(self.timestamp-pd.Timedelta(2,'h'))-i*pd.Timedelta(1,'d'):self.timestamp-i*pd.Timedelta(1,'d')+pd.Timedelta(1,'ns')]) #Add one nanosecond here in order to include the index value self.timestamp
         return quantile_check_list
 
     def do_quantile_check(self, quantile_check_list):
