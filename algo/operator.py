@@ -52,6 +52,7 @@ class Operator(util.OperatorBase):
         self.current_time_window_start = None
         self.timestamp = None
         self.last_time_window_start = None
+        self.last_time_operator_sent_data = pd.Timestamp.now()
 
         self.time_window_consumption_clustering = {}
 
@@ -165,12 +166,12 @@ class Operator(util.OperatorBase):
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
-            return {'value': 0, 'quantile_check': quantile_check}
+            operator_output = {'value': 0, 'quantile_check': quantile_check}
         elif self.consumption_same_time_window != []:
             self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
-                return {'value': 0, 'quantile_check': quantile_check}
+                operator_output = {'value': 0, 'quantile_check': quantile_check}
             else:
                 self.update_time_window_consumption_list_dict()
                 if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']) >= 10:
@@ -179,9 +180,13 @@ class Operator(util.OperatorBase):
                     days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
                     self.consumption_same_time_window = [data]                 
                     if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
-                        return {'value': 1, 'quantile_check': quantile_check} 
+                        operator_output = {'value': 1, 'quantile_check': quantile_check} 
+                        return operator_output
                     else:
-                        return {'value': 0, 'quantile_check': quantile_check}
+                        operator_output = {'value': 0, 'quantile_check': quantile_check}
                 else:
                     self.consumption_same_time_window = [data] 
-                    return {'value': 0, 'quantile_check': quantile_check}
+                    operator_output = {'value': 0, 'quantile_check': quantile_check}
+        
+        if self.timestamp-self.last_time_operator_sent_data >= pd.Timedelta(1,'min'):
+            return operator_output
