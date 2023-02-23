@@ -189,4 +189,5 @@ class Operator(util.OperatorBase):
                     operator_output = {'value': 0, 'quantile_check': quantile_check}
         
         if self.timestamp-self.last_time_operator_sent_data >= pd.Timedelta(1,'min'):
+            self.last_time_operator_sent_data = self.timestamp
             return operator_output
