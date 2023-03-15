@@ -188,6 +188,6 @@ class Operator(util.OperatorBase):
                     self.consumption_same_time_window = [data] 
                     operator_output = {'value': 0, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)}
         
-        if self.timestamp-self.last_time_operator_sent_data >= pd.Timedelta(1,'min'):
+        if self.timestamp-self.last_time_operator_sent_data >= pd.Timedelta(5,'min'):
             self.last_time_operator_sent_data = self.timestamp
             return operator_output
