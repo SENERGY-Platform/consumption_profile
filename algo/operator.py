@@ -163,6 +163,7 @@ class Operator(util.OperatorBase):
         if self.timestamp.day%14==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
             if self.data_history.index[-2].date()<self.timestamp.date():
                 self.update_time_window_data()
+                print(self.window_boundaries_times)
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
