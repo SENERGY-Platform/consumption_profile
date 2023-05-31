@@ -68,7 +68,7 @@ def window_determination(data_series):
     peaks_mean, properties_mean = find_peaks(smoothed_mean_list, distance=20, prominence=prominence)
     # Compute the peaks and bases of the peaks.
 
-    # We use these information now to divide the time line into windows (we add the start and the end of the day to the list, i.e. 0 and 287).
+    # We use these information now to divide the time line into windows (we add the start of the day to the list, i.e. 0).
 
     window_boundaries_points = sorted(list(set([0]+list(properties_mean['left_bases'])+list(properties_mean['right_bases']))))
 
@@ -86,7 +86,7 @@ def window_determination(data_series):
 
     window_boundaries_times = [(pd.Timestamp.now().floor('d')+i*pd.Timedelta('5T')).time() for i in window_boundaries_points]
 
-    # Next we replace the timestamp from 23:55 to 23:59:59:999999
+    # Next we set the last timestamp to 23:59:59:999999
 
     window_boundaries_times[-1] = (pd.Timestamp.now().floor('d')-pd.Timedelta('1ns')).time()
 
