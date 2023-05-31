@@ -10,15 +10,15 @@ from collections import defaultdict
 from scipy.signal import savgol_filter, find_peaks
 import math
 
-def create_daily_five_min_groups(data_series):
+def create_daily_ten_min_groups(data_series):
     grouped_by_day = data_series.groupby(by=lambda x: x.floor('d')) 
     # Groups the data series by day
 
-    grouped_five_min = []
+    grouped_ten_min = []
     for group in grouped_by_day:
-        grouped_five_min.append(group[1].groupby(pd.Grouper(freq='5T')))
+        grouped_ten_min.append(group[1].groupby(pd.Grouper(freq='10T')))
     
-    return grouped_five_min
+    return grouped_ten_min
 
 def compute_time_window_consumptions(list_of_time_windows):
     consumption_series_list_time_window = []
@@ -27,34 +27,34 @@ def compute_time_window_consumptions(list_of_time_windows):
         for window in day:
             if list(window)!=[]:
                 time_window_data.append(1000*(window.iloc[-1]-window.iloc[0]))
-        consumption_series_list_time_window.append(pd.Series(data=time_window_data, index=[window.index[0].floor('5T') for window in day if list(window)!=[]]))
+        consumption_series_list_time_window.append(pd.Series(data=time_window_data, index=[window.index[0].floor('10T') for window in day if list(window)!=[]]))
 
     for i, series in reversed(list(enumerate(consumption_series_list_time_window))):
-        if len(series) != 288:
+        if len(series) != 144:
             del consumption_series_list_time_window[i]
-    # The series with less than 288 entries in the list consumption_series_list_five_min got deleted.
+    # The series with less than 144 entries in the list consumption_series_list_ten_min got deleted.
 
     return consumption_series_list_time_window
 
 
 def window_determination(data_series):
-    grouped_five_min = create_daily_five_min_groups(data_series)
-    # Each object in the list grouped_five_min contains the data from data_series from a single day grouped into slots of five minutes.
-    grouped_five_min_list = [[group[1] for group in day] for day in grouped_five_min]
+    grouped_ten_min = create_daily_ten_min_groups(data_series)
+    # Each object in the list grouped_ten_min contains the data from data_series from a single day grouped into slots of ten minutes.
+    grouped_ten_min_list = [[group[1] for group in day] for day in grouped_ten_min]
     
-    consumption_series_list_five_min =  compute_time_window_consumptions(grouped_five_min_list)                                    
-    # Each object in the list consumption_series_list_five_min contains a pandas series in which for a single day the consumption within the 5-minutes time slots is stored.
-    # I.e. eech pandas series in this list has 24*(60/5)=24*12=288 entries if the data is clean. The series with less entries get ignored.
+    consumption_series_list_ten_min =  compute_time_window_consumptions(grouped_ten_min_list)                                    
+    # Each object in the list consumption_series_list_ten_min contains a pandas series in which for a single day the consumption within the 10-minutes time slots is stored.
+    # I.e. eech pandas series in this list has 24*(60/10)=24*6=144 entries if the data is clean. The series with less entries get ignored.
 
     
-    index = [series.index[0].date() for series in consumption_series_list_five_min] # This just a list which contains the days.
+    index = [series.index[0].date() for series in consumption_series_list_ten_min] # This just a list which contains the days.
 
     aux_dict = defaultdict(list)
-    for series in consumption_series_list_five_min:
+    for series in consumption_series_list_ten_min:
         for timestamp in list(series.index):
             aux_dict[timestamp.time()].append(series.loc[timestamp])
     df = pd.DataFrame(data=aux_dict, index=index)
-    # The pandas dataframe df has the days as indices and the 288 5min time slots in a day as columns. The entries are the consumption from the respective day in the 
+    # The pandas dataframe df has the days as indices and the 144 10min time slots in a day as columns. The entries are the consumption from the respective day in the 
     # respective time slot.
 
     scaled_mean_array = 10000*df.mean(axis=0)
@@ -76,7 +76,7 @@ def window_determination(data_series):
 
     points_to_delete_indices = []
     for i, x in enumerate(window_boundaries_points[:-1]):
-        if window_boundaries_points[i+1]-x < 6:
+        if window_boundaries_points[i+1]-x < 3:
             points_to_delete_indices.append(i+1)
     points_to_delete_indices.reverse()    
     for j in points_to_delete_indices:
@@ -84,7 +84,7 @@ def window_determination(data_series):
 
     # Then we convert the boundary points to time objects.
 
-    window_boundaries_times = [(pd.Timestamp.now().floor('d')+i*pd.Timedelta('5T')).time() for i in window_boundaries_points]
+    window_boundaries_times = [(pd.Timestamp.now().floor('d')+i*pd.Timedelta('10T')).time() for i in window_boundaries_points]
 
     # Next we set the last timestamp to 23:59:59:999999
 
