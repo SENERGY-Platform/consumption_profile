@@ -159,7 +159,7 @@ class Operator(util.OperatorBase):
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if data['Consumption'] != None:
             self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
-        quantile_check_list = self.update_quantile_check_list()
+        '''quantile_check_list = self.update_quantile_check_list()
         quantile_check = self.do_quantile_check(quantile_check_list)
         if self.timestamp.day%14==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
             if self.data_history.index[-2].date()<self.timestamp.date():
@@ -192,4 +192,4 @@ class Operator(util.OperatorBase):
         
         if self.timestamp-self.last_time_operator_sent_data >= pd.Timedelta(5,'min'):
             self.last_time_operator_sent_data = self.timestamp
-            return operator_output
+            return operator_output'''
