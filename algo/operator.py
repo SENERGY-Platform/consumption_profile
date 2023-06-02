@@ -159,7 +159,8 @@ class Operator(util.OperatorBase):
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if data['Consumption'] != None:
             self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
-            with open(f'{self.data_path}_data_history')
+            with open(f'{self.data_path}_data_history', 'wb') as f:
+                pickle.dump(self.data_history, f)
         '''quantile_check_list = self.update_quantile_check_list()
         quantile_check = self.do_quantile_check(quantile_check_list)
         if self.timestamp.day%14==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
