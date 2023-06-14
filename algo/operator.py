@@ -60,6 +60,7 @@ class Operator(util.OperatorBase):
         self.epsilon_file_path = f'{data_path}/epsilon.pickle'
         self.time_window_consumption_list_dict_file_path = f'{data_path}/time_window_consumption_list_dict.pickle'
         self.time_window_consumption_list_dict_anomaly_file_path = f'{data_path}/time_window_consumption_list_dict_anomaly.pickle'
+        self.data_history_file = f'{data_path}/data_history.pickle'
 
     def todatetime(self, timestamp):
         if str(timestamp).isdigit():
@@ -175,6 +176,8 @@ class Operator(util.OperatorBase):
                 operator_output = {'value': 0, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)}
             else:
                 self.update_time_window_consumption_list_dict()
+                with open(self.data_history_file, 'wb') as f:
+                    pickle.dump(self.data_history, f)
                 if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']) >= 10:
                     epsilon = self.determine_epsilon()
                     clustering_labels = self.create_clustering(epsilon)
