@@ -61,6 +61,25 @@ class Operator(util.OperatorBase):
         self.time_window_consumption_list_dict_file_path = f'{data_path}/time_window_consumption_list_dict.pickle'
         self.time_window_consumption_list_dict_anomaly_file_path = f'{data_path}/time_window_consumption_list_dict_anomaly.pickle'
         self.data_history_file = f'{data_path}/data_history.pickle'
+        self.window_boundaries_times_file = f'{data_path}/window_boundaries_times.pickle'
+
+        if os.path.exists(self.window_boundaries_times_file):
+            with open(self.window_boundaries_times_file, 'rb') as f:
+                if os.path.getsize(self.window_boundaries_times_file) > 0:
+                    self.window_boundaries_times = pickle.load(f)
+        if os.path.exists(self.data_history_file):
+            with open(self.data_history_file, 'rb') as f:
+                if os.path.getsize(self.data_history_file) > 0:
+                    self.data_history = pickle.load(f)
+        if os.path.exists(self.time_window_consumption_list_dict_file_path):
+            with open(self.time_window_consumption_list_dict_file_path, 'rb') as f:
+                if os.path.getsize(self.time_window_consumption_list_dict_file_path) > 0:
+                    self.time_window_consumption_list_dict = pickle.load(f)
+        if os.path.exists(self.time_window_consumption_list_dict_anomaly_file_path):
+            with open(self.time_window_consumption_list_dict_anomaly_file_path, 'rb') as f:
+                if os.path.getsize(self.time_window_consumption_list_dict_anomaly_file_path) > 0:
+                    self.time_window_consumption_list_dict_anomalies = pickle.load(f)
+        
 
     def todatetime(self, timestamp):
         if str(timestamp).isdigit():
@@ -91,6 +110,8 @@ class Operator(util.OperatorBase):
 
     def update_time_window_data(self):
         self.window_boundaries_times = dwdup.window_determination(self.data_history)
+        with open(self.window_boundaries_times_file, 'wb') as f:
+            pickle.dump(self.window_boundaries_times, f)
         self.create_new_time_window_consumption_list_dict()
 
     def update_time_window_consumption_list_dict(self):
