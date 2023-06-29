@@ -179,7 +179,7 @@ class Operator(util.OperatorBase):
     def run(self, data, selector='energy_func'):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
-        if self.timestamp <= self.data_history.index[-1]:
+        if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
             return
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
         quantile_check_list = self.update_quantile_check_list()
