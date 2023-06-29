@@ -178,7 +178,7 @@ class Operator(util.OperatorBase):
     
     def run(self, data, selector='energy_func'):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
-        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(30,'d'):
+        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(17,'d'):
             return
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
@@ -186,7 +186,7 @@ class Operator(util.OperatorBase):
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
         quantile_check_list = self.update_quantile_check_list()
         quantile_check = self.do_quantile_check(quantile_check_list)
-        if self.timestamp.day%14==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
+        if self.timestamp.day%30==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
             if self.data_history.index[-2].date()<self.timestamp.date():
                 self.update_time_window_data()
                 print(self.window_boundaries_times)
