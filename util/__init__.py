@@ -23,18 +23,20 @@ import kazoo.client
 import json
 import typing
 import hashlib
+from os import path
 
 
 def print_init(name, git_info_file):
     lines = list()
     l_len = len(name)
-    with open(git_info_file, "r") as file:
-        for line in file:
-            key, value = line.strip().split("=")
-            line = f"{key}: {value}"
-            lines.append(line)
-            if len(line) > l_len:
-                l_len = len(line)
+    if path.exists(git_info_file):
+        with open(git_info_file, "r") as file:
+            for line in file:
+                key, value = line.strip().split("=")
+                line = f"{key}: {value}"
+                lines.append(line)
+                if len(line) > l_len:
+                    l_len = len(line)
     if len(name) < l_len:
         l_len = math.ceil((l_len - len(name) - 2) / 2)
         print("*" * l_len + f" {name} " + "*" * l_len)
