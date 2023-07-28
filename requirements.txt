@@ -14,3 +14,4 @@ similaritymeasures
 pyarrow
 scikit-learn
 kneed[plot]
+python-dotenv==1.0.0
