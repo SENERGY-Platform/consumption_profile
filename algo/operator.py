@@ -115,6 +115,12 @@ class Operator(util.OperatorBase):
         self.create_new_time_window_consumption_list_dict()
 
     def update_time_window_consumption_list_dict(self):
+        if (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > 2*pd.Timedelta(1,'h')) or (
+           (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) < 0*pd.Timedelta(1,'h')) and (
+            pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > -22*pd.Timedelta(1,'h')
+           ) 
+        ):
+            return
         min_index = np.argmin([float(datapoint['Consumption']) for datapoint in self.consumption_same_time_window])
         max_index = np.argmax([float(datapoint['Consumption']) for datapoint in self.consumption_same_time_window])
         time_window_consumption_max = float(self.consumption_same_time_window[max_index]['Consumption'])
@@ -178,8 +184,8 @@ class Operator(util.OperatorBase):
     
     def run(self, data, selector='energy_func'):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
-        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(17,'d'):
-            return
+        #if pd.Timestamp.now() - self.timestamp > pd.Timedelta(17,'d'):
+            #return
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
             return
