@@ -42,7 +42,7 @@ class Operator(util.OperatorBase):
 
 
         self.window_boundaries_times =  [datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0), 
-                                         datetime.time(18, 0), datetime.time(21, 0), datetime.time(23, 59, 59, 999999)]
+                                         datetime.time(18, 0), datetime.time(21, 0)]
                                       
 
 
@@ -115,9 +115,9 @@ class Operator(util.OperatorBase):
         self.create_new_time_window_consumption_list_dict()
 
     def update_time_window_consumption_list_dict(self):
-        if (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > 2*pd.Timedelta(1,'h')) or (
+        if (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > 3*pd.Timedelta(1,'h')) or (
            (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) < 0*pd.Timedelta(1,'h')) and (
-            pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > -22*pd.Timedelta(1,'h')
+            pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > -21*pd.Timedelta(1,'h')
            ) 
         ):
             return

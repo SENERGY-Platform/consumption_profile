@@ -90,12 +90,12 @@ def window_determination(data_series):
 
     window_boundaries_times = [(pd.Timestamp.now().floor('d')+i*pd.Timedelta('10T')).time() for i in window_boundaries_points]
 
-    # As a last step we check if the time windows are too long. (Threshold is 2 hours)
+    # As a last step we check if the time windows are too long. (Threshold is 3 hours)
 
     new_window_boundary_times = window_boundaries_times
     for i, time in enumerate(window_boundaries_times[:-1]):
-        if pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)) >= pd.Timedelta(2,'h'):
-            num_additional_slots = math.ceil((pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)))/pd.Timedelta(2,'h'))
+        if pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)) > pd.Timedelta(3,'h'):
+            num_additional_slots = math.ceil((pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)))/pd.Timedelta(3,'h'))
             len_new_slots = (pd.Timestamp(str(window_boundaries_times[i+1]))-pd.Timestamp(str(time)))/num_additional_slots
             additional_slots = []
             for j in range(1,num_additional_slots):
@@ -104,8 +104,8 @@ def window_determination(data_series):
             aux[i+1:i+1] = additional_slots
             new_window_boundary_times += aux
 
-    if pd.Timestamp(str(window_boundaries_times[0]))-pd.Timestamp(str(window_boundaries_times[-1]))+pd.Timedelta(1,'d') >= pd.Timedelta(2,'h'):
-            num_additional_slots = math.ceil((pd.Timestamp(str(window_boundaries_times[0]))-pd.Timestamp(str(window_boundaries_times[-1]))+pd.Timedelta(1,'d'))/pd.Timedelta(2,'h'))
+    if pd.Timestamp(str(window_boundaries_times[0]))-pd.Timestamp(str(window_boundaries_times[-1]))+pd.Timedelta(1,'d') > pd.Timedelta(3,'h'):
+            num_additional_slots = math.ceil((pd.Timestamp(str(window_boundaries_times[0]))-pd.Timestamp(str(window_boundaries_times[-1]))+pd.Timedelta(1,'d'))/pd.Timedelta(3,'h'))
             len_new_slots = (pd.Timestamp(str(window_boundaries_times[0]))-pd.Timestamp(str(window_boundaries_times[-1]))+pd.Timedelta(1,'d'))/num_additional_slots
             additional_slots = []
             for i in range(1,num_additional_slots):
