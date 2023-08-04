@@ -122,22 +122,6 @@ class Operator(util.OperatorBase):
             pickle.dump(self.time_window_consumption_list_dict, f)
         return
 
-    def update_quantile_check_list(self):
-        quantile_check_list = []
-        for i in range(14):
-            if len(self.data_history[(self.timestamp-pd.Timedelta(2,'h'))-i*pd.Timedelta(1,'d'):self.timestamp-i*pd.Timedelta(1,'d')+pd.Timedelta(1,'ns')]) > 0:
-                quantile_check_list.append(self.data_history[(self.timestamp-pd.Timedelta(2,'h'))-i*pd.Timedelta(1,'d'):self.timestamp-i*pd.Timedelta(1,'d')+pd.Timedelta(1,'ns')]) #Add one nanosecond here in order to include the index value self.timestamp
-        return quantile_check_list
-
-    def do_quantile_check(self, quantile_check_list):
-        quantile_check_consumption_list = [data[-1]-data[0] for data in quantile_check_list]
-        quantile = np.quantile(quantile_check_consumption_list,0.05)
-        if quantile_check_consumption_list[0] <= quantile:
-            return 1
-        else:
-            return 0
-
-
     def determine_epsilon(self):
         neighbors = NearestNeighbors(n_neighbors=10)
         neighbors_fit = neighbors.fit(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']]).reshape(-1,1))
@@ -180,8 +164,6 @@ class Operator(util.OperatorBase):
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
             return
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
-        quantile_check_list = self.update_quantile_check_list()
-        quantile_check = self.do_quantile_check(quantile_check_list)
         if self.timestamp.day%30==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
             if self.data_history.index[-2].date()<self.timestamp.date():
                 with open(f'{self.data_path}/time_window_consumption_list_dict_{str(self.timestamp.date())}.pickle', 'wb') as f:
@@ -191,12 +173,12 @@ class Operator(util.OperatorBase):
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
-            operator_output = {'value': 0, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)}
+            operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
         elif self.consumption_same_time_window != []:
             self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
-                operator_output = {'value': 0, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)}
+                operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
             else:
                 self.consumption_same_time_window.append(data) #!!! Otherwise I lose energy which is consumed between two consecutive windows.
                 self.update_time_window_consumption_list_dict()
@@ -208,14 +190,12 @@ class Operator(util.OperatorBase):
                     days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
                     self.consumption_same_time_window = [data]                 
                     if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
-                        operator_output = {'value': 1, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)} 
+                        operator_output = {'value': 1, 'timestamp': str(self.timestamp)} 
                         return operator_output
                     else:
-                        operator_output = {'value': 0, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)}
+                        operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
                 else:
                     self.consumption_same_time_window = [data] 
-                    operator_output = {'value': 0, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)}
+                    operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
         
-        if self.timestamp-self.last_time_operator_sent_data >= pd.Timedelta(5,'min'):
-            self.last_time_operator_sent_data = self.timestamp
-            return operator_output
+        return operator_output
