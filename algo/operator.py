@@ -35,6 +35,7 @@ class Operator(util.OperatorBase):
             os.mkdir(data_path)
 
         self.device_name = device_name
+        self.data_path = data_path
 
         self.time_window_consumption_list_dict = defaultdict(list)
         self.time_window_consumption_list_dict_anomalies = defaultdict(list)
@@ -93,20 +94,11 @@ class Operator(util.OperatorBase):
     def create_new_time_window_consumption_list_dict(self):
         self.time_window_consumption_list_dict = defaultdict(list)
         list_of_time_windows = dwdup.window_division(self.window_boundaries_times, self.data_history[(self.timestamp-pd.Timedelta(14,'d')).floor('d'):])
-        consumption_series_list_time_window = []
         for day in list_of_time_windows:
-            time_window_data = []
-            for window in day:
+            for window_name, window in day:
                 if list(window)!=[]:
-                    time_window_data.append(1000*(window.iloc[-1]-window.iloc[0]))
-            consumption_series_list_time_window.append(pd.Series(data=time_window_data, index=[window.index[-1] for window in day if list(window)!=[]]))
-        
-        for i, time in enumerate(self.window_boundaries_times[:-1]):
-            for day in consumption_series_list_time_window:
-                aux_time_start = day.index[0].floor('d')+pd.Timedelta(str(time))
-                aux_time_stop = day.index[0].floor('d')+pd.Timedelta(str(self.window_boundaries_times[i+1]))
-                aux_partial_series = day[aux_time_start:aux_time_stop]
-                self.time_window_consumption_list_dict[f'{str(time)}-{self.window_boundaries_times[i+1]}'].extend([(aux_partial_series.index[j], aux_partial_series.iloc[j]) for j in range(len(aux_partial_series))])
+                    overall_time_window_consumption = 1000*(window.iloc[-1]-window.iloc[0])
+                    self.time_window_consumption_list_dict[window_name].append((window.index[-1], overall_time_window_consumption))
 
     def update_time_window_data(self):
         self.window_boundaries_times = dwdup.window_determination(self.data_history)
@@ -121,10 +113,8 @@ class Operator(util.OperatorBase):
            ) 
         ):
             return
-        min_index = np.argmin([float(datapoint['Consumption']) for datapoint in self.consumption_same_time_window])
-        max_index = np.argmax([float(datapoint['Consumption']) for datapoint in self.consumption_same_time_window])
-        time_window_consumption_max = float(self.consumption_same_time_window[max_index]['Consumption'])
-        time_window_consumption_min = float(self.consumption_same_time_window[min_index]['Consumption'])
+        time_window_consumption_max = float(self.consumption_same_time_window[-1]['Consumption'])
+        time_window_consumption_min = float(self.consumption_same_time_window[0]['Consumption'])
         overall_time_window_consumption = 1000*(time_window_consumption_max-time_window_consumption_min)
         if np.isnan(overall_time_window_consumption)==False:
             self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.timestamp, overall_time_window_consumption))
@@ -184,7 +174,7 @@ class Operator(util.OperatorBase):
     
     def run(self, data, selector='energy_func'):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
-        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(46,'d'):
+        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(53,'d'):
             return
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
@@ -194,6 +184,8 @@ class Operator(util.OperatorBase):
         quantile_check = self.do_quantile_check(quantile_check_list)
         if self.timestamp.day%30==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
             if self.data_history.index[-2].date()<self.timestamp.date():
+                with open(f'{self.data_path}/time_window_consumption_list_dict_{str(self.timestamp.date())}.pickle', 'wb') as f:
+                    pickle.dump(self.time_window_consumption_list_dict, f)
                 self.update_time_window_data()
                 print(self.window_boundaries_times)
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
@@ -206,6 +198,7 @@ class Operator(util.OperatorBase):
                 self.consumption_same_time_window.append(data)
                 operator_output = {'value': 0, 'quantile_check': quantile_check, 'timestamp': str(self.timestamp)}
             else:
+                self.consumption_same_time_window.append(data) #!!! Otherwise I lose energy which is consumed between two consecutive windows.
                 self.update_time_window_consumption_list_dict()
                 with open(self.data_history_file, 'wb') as f:
                     pickle.dump(self.data_history, f)

@@ -139,8 +139,21 @@ def window_division(list_of_timestamps, data_series):
         data_of_one_day = group[1]
         divided_data_for_one_day = []
         for i, time in enumerate(list_of_timestamps[:-1]):
-            divided_data_for_one_day.append(data_of_one_day[group[1].index[0].floor('d')+pd.Timedelta(str(time)):
-                                                            group[1].index[0].floor('d')+pd.Timedelta(str(list_of_timestamps[i+1]))])
+            aux_series_start = data_of_one_day[group[1].index[0].floor('d')+pd.Timedelta(str(time)):
+                                                            group[1].index[0].floor('d')+pd.Timedelta(str(list_of_timestamps[i+1]))]
+            aux_series_end = data_of_one_day[group[1].index[0].floor('d')+pd.Timedelta(str(list_of_timestamps[i+1])):]
+            if len(aux_series_start) > 0 and len(aux_series_end) > 0 and aux_series_start.index[-1]==aux_series_end.index[0]:
+                divided_data_for_one_day.append((f'{str(time)}-{list_of_timestamps[i+1]}', pd.concat([aux_series_start, aux_series_end.iloc[1:2]])))
+            elif len(aux_series_start) > 0 and len(aux_series_end) > 0 and aux_series_start.index[-1]!=aux_series_end.index[0]:
+                divided_data_for_one_day.append((f'{str(time)}-{list_of_timestamps[i+1]}', pd.concat([aux_series_start, aux_series_end.iloc[0:1]])))
+            elif len(aux_series_start) == 0 and len(aux_series_end) > 0:
+                divided_data_for_one_day.append((f'{str(time)}-{list_of_timestamps[i+1]}', pd.Series([], dtype=object)))
+            elif len(aux_series_start) > 0 and len(aux_series_end) == 0:
+                divided_data_for_one_day.append((f'{str(time)}-{list_of_timestamps[i+1]}', aux_series_start))
+            else:
+                divided_data_for_one_day.append((f'{str(time)}-{list_of_timestamps[i+1]}', pd.Series([], dtype=object)))
+        divided_data_for_one_day.append((f'{list_of_timestamps[-1]}-00:00:00', data_of_one_day[group[1].index[0].floor('d')+pd.Timedelta(str(list_of_timestamps[i+1])):])) # Here we lose information about consumption between last total of last day and first total of new day. TODO!
         grouped_wrt_timestamps.append(divided_data_for_one_day)
+    print(grouped_wrt_timestamps) 
     return grouped_wrt_timestamps
     
