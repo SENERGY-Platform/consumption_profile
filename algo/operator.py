@@ -125,8 +125,8 @@ class Operator(util.OperatorBase):
 
     def determine_epsilon(self):
         neighbors = NearestNeighbors(n_neighbors=10)
-        neighbors_fit = neighbors.fit(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']]).reshape(-1,1))
-        distances, _ = neighbors_fit.kneighbors(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']]).reshape(-1,1))
+        neighbors_fit = neighbors.fit(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
+        distances, _ = neighbors_fit.kneighbors(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
         distances = np.sort(distances, axis=0)
         distances_x = distances[:,1]
         kneedle = kneed.KneeLocator(np.linspace(0,1,len(distances_x)), distances_x, S=0.9, curve="convex", direction="increasing")
@@ -140,26 +140,26 @@ class Operator(util.OperatorBase):
 
     def create_clustering(self, epsilon):
         self.time_window_consumption_clustering[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'] = DBSCAN(eps=epsilon, min_samples=7).fit(np.array([time_window_consumption 
-                                                                     for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']]).reshape(-1,1))
+                                                                     for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
         with open(self.clustering_file_path, 'wb') as f:
             pickle.dump(self.time_window_consumption_clustering, f)
         return self.time_window_consumption_clustering[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].labels_
     
     def test_time_window_consumption(self, clustering_labels):
         anomalous_indices = np.where(clustering_labels==-1)[0]
-        quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']],0.05)
-        anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][i][1] < quantile]
-        if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'])-1 in anomalous_indices_low:
+        quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]],0.05)
+        anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i][1] < quantile]
+        if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:])-1 in anomalous_indices_low:
             print(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
             self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1])
         with open(self.time_window_consumption_list_dict_anomaly_file_path, 'wb') as f:
             pickle.dump(self.time_window_consumption_list_dict_anomalies,f)
 
-        return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][i] for i in anomalous_indices_low]
+        return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low]
     
     def run(self, data, selector='energy_func'):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
-        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(53,'d'):
+        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(56,'d'):
             return
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
