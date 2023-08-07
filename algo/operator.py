@@ -98,7 +98,8 @@ class Operator(util.OperatorBase):
             for window_name, window in day:
                 if list(window)!=[]:
                     overall_time_window_consumption = 1000*(window.iloc[-1]-window.iloc[0])
-                    self.time_window_consumption_list_dict[window_name].append((window.index[-1], overall_time_window_consumption))
+                    if overall_time_window_consumption>=0:
+                        self.time_window_consumption_list_dict[window_name].append((window.index[-1], overall_time_window_consumption))
 
     def update_time_window_data(self):
         self.window_boundaries_times = dwdup.window_determination(self.data_history)
@@ -116,7 +117,7 @@ class Operator(util.OperatorBase):
         time_window_consumption_max = float(self.consumption_same_time_window[-1]['Consumption'])
         time_window_consumption_min = float(self.consumption_same_time_window[0]['Consumption'])
         overall_time_window_consumption = 1000*(time_window_consumption_max-time_window_consumption_min)
-        if np.isnan(overall_time_window_consumption)==False:
+        if np.isnan(overall_time_window_consumption)==False and overall_time_window_consumption >= 0:
             self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.timestamp, overall_time_window_consumption))
         with open(self.time_window_consumption_list_dict_file_path, 'wb') as f:
             pickle.dump(self.time_window_consumption_list_dict, f)
