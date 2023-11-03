@@ -9,6 +9,7 @@ import numpy as np
 from collections import defaultdict
 from scipy.signal import savgol_filter, find_peaks
 import math
+import pickle
 
 def create_daily_ten_min_groups(data_series):
     grouped_by_day = data_series.groupby(by=lambda x: x.floor('d')) 
@@ -64,6 +65,8 @@ def window_determination(data_series):
 
     smooth_scaled_mean_array = savgol_filter(scaled_mean_array, 20, 2)
     smoothed_mean_list = smooth_scaled_mean_array.tolist()
+    with open(f"/opt/data/curve_{str(pd.Timestamp.now())}", "rb") as f:
+        pickle.dump(smoothed_mean_list, f)
     # As a next step we smoothen the arrays and convert them to lists.
 
     prominence = float(max(smooth_scaled_mean_array))/float(25) # This is kind of random here!?
