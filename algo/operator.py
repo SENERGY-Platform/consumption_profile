@@ -158,6 +158,8 @@ class Operator(util.OperatorBase):
         return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low]
     
     def run(self, data, selector='energy_func'):
+        if self.timestamp != None and self.todatetime(data['Time']).tz_localize(None)-self.timestamp < pd.Timedelta(5,'minute'):
+            return
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
         #if pd.Timestamp.now() - self.timestamp > pd.Timedelta(56,'d'):
             #return
