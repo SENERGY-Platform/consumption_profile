@@ -63,7 +63,7 @@ def window_determination(data_series):
     scaled_mean_array = 10000*df.mean(axis=0)
     # We compute the mean along the rows (i.e. days) and scale up by 10000.
 
-    smooth_scaled_mean_array = savgol_filter(scaled_mean_array, 20, 2)
+    smooth_scaled_mean_array = savgol_filter(scaled_mean_array, 50, 2)
     smoothed_mean_list = smooth_scaled_mean_array.tolist()
     with open(f"/opt/data/curve_{str(pd.Timestamp.now())}", "wb") as f:
         pickle.dump(smoothed_mean_list, f)
