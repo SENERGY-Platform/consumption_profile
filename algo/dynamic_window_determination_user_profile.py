@@ -76,6 +76,8 @@ def window_determination(data_series):
     # We use these information now to divide the time line into windows (we add the start of the day to the list, i.e. 0).
 
     window_boundaries_points = sorted(list(set([0]+list(properties_mean['left_bases'])+list(properties_mean['right_bases']))))
+    with open(f"/opt/data/window_boundary_points_{str(pd.Timestamp.now())}", "wb") as f:
+        pickle.dump(window_boundaries_points, f)
 
     # Now we check if boundary point are too close together (i.e. closer than 0.5 hour):
 
