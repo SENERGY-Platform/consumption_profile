@@ -67,6 +67,8 @@ def window_determination(data_series):
     smoothed_mean_list = smooth_scaled_mean_array.tolist()
     with open(f"/opt/data/curve_{str(pd.Timestamp.now())}", "wb") as f:
         pickle.dump(scaled_mean_array, f)
+    with open(f"/opt/data/smoothe_curve_{str(pd.Timestamp.now())}", "wb") as f:
+        pickle.dump(scaled_mean_array, f)
     # As a next step we smoothen the arrays and convert them to lists.
 
     prominence = float(max(smooth_scaled_mean_array))/float(25) # This is kind of random here!?
