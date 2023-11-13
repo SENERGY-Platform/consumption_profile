@@ -161,7 +161,7 @@ class Operator(util.OperatorBase):
         if self.timestamp != None and self.todatetime(data['Time']).tz_localize(None)-self.timestamp < pd.Timedelta(5,'minute'):
             return
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
-        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(219,'d'):
+        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(157,'d'):
             return
         print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
