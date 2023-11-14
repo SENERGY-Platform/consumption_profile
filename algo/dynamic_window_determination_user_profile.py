@@ -60,6 +60,9 @@ def window_determination(data_series):
     # The pandas dataframe df has the days as indices and the 144 10min time slots in a day as columns. The entries are the consumption from the respective day in the 
     # respective time slot.
 
+    df[df<0]=np.nan
+    # Here we discard negative values in the dataframe. Negative values do not make sense and can only occure through wrong data.
+
     scaled_mean_array = 10000*df.mean(axis=0)
     # We compute the mean along the rows (i.e. days) and scale up by 10000.
 
