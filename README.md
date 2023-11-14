@@ -1,3 +1,3 @@
-# Hourly Consumption Profile
+# Consumption Profile
 
 ## Config options
