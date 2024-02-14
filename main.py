@@ -63,12 +63,12 @@ class Operator(OperatorBase):
 
         self.time_window_consumption_clustering = {}
 
-        self.clustering_file_path = f'{data_path}/clustering.pickle'
-        self.epsilon_file_path = f'{data_path}/epsilon.pickle'
-        self.time_window_consumption_list_dict_file_path = f'{data_path}/time_window_consumption_list_dict.pickle'
-        self.time_window_consumption_list_dict_anomaly_file_path = f'{data_path}/time_window_consumption_list_dict_anomaly.pickle'
-        self.data_history_file = f'{data_path}/data_history.pickle'
-        self.window_boundaries_times_file = f'{data_path}/window_boundaries_times.pickle'
+        self.clustering_file_path = f'{self.data_path}/clustering.pickle'
+        self.epsilon_file_path = f'{self.data_path}/epsilon.pickle'
+        self.time_window_consumption_list_dict_file_path = f'{self.data_path}/time_window_consumption_list_dict.pickle'
+        self.time_window_consumption_list_dict_anomaly_file_path = f'{self.data_path}/time_window_consumption_list_dict_anomaly.pickle'
+        self.data_history_file = f'{self.data_path}/data_history.pickle'
+        self.window_boundaries_times_file = f'{self.data_path}/window_boundaries_times.pickle'
 
         if os.path.exists(self.window_boundaries_times_file):
             with open(self.window_boundaries_times_file, 'rb') as f:
