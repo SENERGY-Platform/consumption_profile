@@ -59,7 +59,6 @@ class Operator(OperatorBase):
         self.current_time_window_start = None
         self.timestamp = None
         self.last_time_window_start = None
-        self.last_time_operator_sent_data = pd.Timestamp.now()
 
         self.time_window_consumption_clustering = {}
 
@@ -173,7 +172,7 @@ class Operator(OperatorBase):
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
             return
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
-        if self.timestamp.day%30==0 and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
+        if self.timestamp.is_month_end==True and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
             if self.data_history.index[-2].date()<self.timestamp.date():
                 with open(f'{self.data_path}/time_window_consumption_list_dict_{str(self.timestamp.date())}.pickle', 'wb') as f:
                     pickle.dump(self.time_window_consumption_list_dict, f)
