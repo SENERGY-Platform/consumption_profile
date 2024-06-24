@@ -47,7 +47,7 @@ def window_determination(data_series):
     
     consumption_series_list_ten_min =  compute_time_window_consumptions(grouped_ten_min_list)                                    
     # Each object in the list consumption_series_list_ten_min contains a pandas series in which for a single day the consumption within the 10-minutes time slots is stored.
-    # I.e. eech pandas series in this list has 24*(60/10)=24*6=144 entries if the data is clean. The series with less entries get ignored.
+    # I.e. each pandas series in this list has 24*(60/10)=24*6=144 entries if the data is clean. The series with less entries get ignored.
 
     
     index = [series.index[0].date() for series in consumption_series_list_ten_min] # This just a list which contains the days.

@@ -16,7 +16,8 @@
 
 __all__ = ("Operator", )
 
-from operator_lib.util import OperatorBase, logger
+from operator_lib.util import OperatorBase, logger, InitPhase
+from operator_lib.util.persistence import save, load
 import pandas as pd
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -32,6 +33,18 @@ from algo import dynamic_window_determination_user_profile as dwdup
 from operator_lib.util import Config
 class CustomConfig(Config):
     data_path = "/opt/data"
+    init_phase_length: float = 2
+    init_phase_level: str = "d"
+
+    def __init__(self, d, **kwargs):
+        super().__init__(d, **kwargs)
+        if self.init_phase_length != '':
+            self.init_phase_length = float(self.init_phase_length)
+        else:
+            self.init_phase_length = 2
+        
+        if self.init_phase_level == '':
+            self.init_phase_level = 'd'
 
 class Operator(OperatorBase):
     configType = CustomConfig
@@ -39,6 +52,21 @@ class Operator(OperatorBase):
     def init(self,  *args, **kwargs):
         super().init(*args, **kwargs)
         self.data_path = self.config.data_path
+        self.first_data_time = load(self.config.data_path, "first_data_time.pickle")
+
+
+
+        self.init_phase_duration = pd.Timedelta(self.config.init_phase_length, self.config.init_phase_level)
+
+        self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
+        value = {
+                    "value": 0,
+                    "timestamp": "",
+                    "message": "",
+                    "last_consumptions": "",
+                    "time_window": ""
+        }
+        self.init_phase_handler.send_first_init_msg(value)
         
         if not os.path.exists(self.data_path):
             os.mkdir(self.data_path)
@@ -56,35 +84,12 @@ class Operator(OperatorBase):
 
         self.consumption_same_time_window = []
 
-        self.current_time_window_start = None
-        self.timestamp = None
-        self.last_time_window_start = None
-
         self.time_window_consumption_clustering = {}
-
-        self.clustering_file_path = f'{self.data_path}/clustering.pickle'
-        self.epsilon_file_path = f'{self.data_path}/epsilon.pickle'
-        self.time_window_consumption_list_dict_file_path = f'{self.data_path}/time_window_consumption_list_dict.pickle'
-        self.time_window_consumption_list_dict_anomaly_file_path = f'{self.data_path}/time_window_consumption_list_dict_anomaly.pickle'
-        self.data_history_file = f'{self.data_path}/data_history.pickle'
-        self.window_boundaries_times_file = f'{self.data_path}/window_boundaries_times.pickle'
-
-        if os.path.exists(self.window_boundaries_times_file):
-            with open(self.window_boundaries_times_file, 'rb') as f:
-                if os.path.getsize(self.window_boundaries_times_file) > 0:
-                    self.window_boundaries_times = pickle.load(f)
-        if os.path.exists(self.data_history_file):
-            with open(self.data_history_file, 'rb') as f:
-                if os.path.getsize(self.data_history_file) > 0:
-                    self.data_history = pickle.load(f)
-        if os.path.exists(self.time_window_consumption_list_dict_file_path):
-            with open(self.time_window_consumption_list_dict_file_path, 'rb') as f:
-                if os.path.getsize(self.time_window_consumption_list_dict_file_path) > 0:
-                    self.time_window_consumption_list_dict = pickle.load(f)
-        if os.path.exists(self.time_window_consumption_list_dict_anomaly_file_path):
-            with open(self.time_window_consumption_list_dict_anomaly_file_path, 'rb') as f:
-                if os.path.getsize(self.time_window_consumption_list_dict_anomaly_file_path) > 0:
-                    self.time_window_consumption_list_dict_anomalies = pickle.load(f)
+        
+        self.window_boundaries_times = load(self.data_path, 'window_boundaries_times.pickle')
+        self.data_history = load(self.data_path, "data_history.pickle")
+        self.time_window_consumption_list_dict = load(self.data_path, "time_window_consumption_list_dict.pickle")
+        self.time_window_consumption_list_dict_anomalies = load(self.data_path, "time_window_consumption_list_dict_anomaly.pickle")
         
 
     def todatetime(self, timestamp):
@@ -105,11 +110,11 @@ class Operator(OperatorBase):
                     overall_time_window_consumption = 1000*(window.iloc[-1]-window.iloc[0])
                     if overall_time_window_consumption>=0:
                         self.time_window_consumption_list_dict[window_name].append((window.index[-1], overall_time_window_consumption))
+        save(self.data_path, "time_window_consumption_list_dict.pickle", self.time_window_consumption_list_dict)
 
     def update_time_window_data(self):
         self.window_boundaries_times = dwdup.window_determination(self.data_history)
-        with open(self.window_boundaries_times_file, 'wb') as f:
-            pickle.dump(self.window_boundaries_times, f)
+        save(self.data_path, 'window_boundaries_times.pickle', self.window_boundaries_times)
         self.create_new_time_window_consumption_list_dict()
 
     def update_time_window_consumption_list_dict(self):
@@ -124,8 +129,7 @@ class Operator(OperatorBase):
         overall_time_window_consumption = 1000*(time_window_consumption_max-time_window_consumption_min)
         if np.isnan(overall_time_window_consumption)==False and overall_time_window_consumption >= 0:
             self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.timestamp, overall_time_window_consumption))
-        with open(self.time_window_consumption_list_dict_file_path, 'wb') as f:
-            pickle.dump(self.time_window_consumption_list_dict, f)
+        save(self.data_path, "time_window_consumption_list_dict.pickle", self.time_window_consumption_list_dict)
         return
 
     def determine_epsilon(self):
@@ -136,8 +140,6 @@ class Operator(OperatorBase):
         distances_x = distances[:,1]
         kneedle = kneed.KneeLocator(np.linspace(0,1,len(distances_x)), distances_x, S=0.9, curve="convex", direction="increasing")
         epsilon = kneedle.knee_y
-        with open(self.epsilon_file_path, 'wb') as f:
-            pickle.dump(epsilon, f)
         if epsilon==0 or epsilon==None:
             return 1
         else:
@@ -146,8 +148,6 @@ class Operator(OperatorBase):
     def create_clustering(self, epsilon):
         self.time_window_consumption_clustering[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'] = DBSCAN(eps=epsilon, min_samples=7).fit(np.array([time_window_consumption 
                                                                      for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
-        with open(self.clustering_file_path, 'wb') as f:
-            pickle.dump(self.time_window_consumption_clustering, f)
         return self.time_window_consumption_clustering[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].labels_
     
     def test_time_window_consumption(self, clustering_labels):
@@ -157,27 +157,44 @@ class Operator(OperatorBase):
         if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:])-1 in anomalous_indices_low:
             logger.warning(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
             self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1])
-        with open(self.time_window_consumption_list_dict_anomaly_file_path, 'wb') as f:
-            pickle.dump(self.time_window_consumption_list_dict_anomalies,f)
+        save(self.data_path, "time_window_consumption_list_dict_anomaly.pickle", self.time_window_consumption_list_dict_anomalies)
 
         return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low]
     
     def run(self, data, selector='energy_func',topic=''):
-        if self.timestamp != None and self.todatetime(data['Time']).tz_localize(None)-self.timestamp < pd.Timedelta(5,'minute'):
-            return
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
+        if not self.first_data_time:
+            self.first_data_time = self.timestamp
+            self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
+            save(self.data_path, "first_data_time.pickle", self.first_data_time)
         if pd.Timestamp.now() - self.timestamp > pd.Timedelta(100,'d'):
             return
         logger.debug('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
-        if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
-            return
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
-        if self.timestamp.is_month_end==True and (self.data_history.index[-1]-self.data_history.index[0] >= pd.Timedelta(10,'d')):
-            if self.data_history.index[-2].date()<self.timestamp.date():
-                with open(f'{self.data_path}/time_window_consumption_list_dict_{str(self.timestamp.date())}.pickle', 'wb') as f:
-                    pickle.dump(self.time_window_consumption_list_dict, f)
-                self.update_time_window_data()
-                logger.debug(self.window_boundaries_times)
+
+        if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]: # Discard points that come in wrong order wrt time.
+            return
+        
+        operator_is_init = self.init_phase_handler.operator_is_in_init_phase(self.timestamp)
+        
+        
+        
+        init_value = {
+                    "value": 0,
+                    "timestamp": str(self.timestamp),
+                    "message": "",
+                    "last_consumptions": "",
+                    "time_window": ""
+        }
+        if operator_is_init:
+            return self.init_phase_handler.generate_init_msg(self.timestamp, init_value)
+
+        if self.init_phase_handler.init_phase_needs_to_be_reset():
+            return self.init_phase_handler.reset_init_phase(init_value)
+
+        if not self.time_window_consumption_list_dict or self.timestamp.is_month_end:# Update time window data right after inital phase and then after each month.
+            self.update_time_window_data()
+            logger.debug(self.window_boundaries_times)
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
@@ -188,22 +205,17 @@ class Operator(OperatorBase):
             else:
                 self.consumption_same_time_window.append(data) #!!! Otherwise I lose energy which is consumed between two consecutive windows.
                 self.update_time_window_consumption_list_dict()
-                with open(self.data_history_file, 'wb') as f:
-                    pickle.dump(self.data_history, f)
-                if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}']) >= 10:
-                    epsilon = self.determine_epsilon()
-                    clustering_labels = self.create_clustering(epsilon)
-                    days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
-                    df_cons_last_14_days = self.create_df_cons_last_14_days()
-                    self.consumption_same_time_window = [data]                 
-                    if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
-                        operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days)
-                        return operator_output
-                    else:
-                        operator_output = self.create_output(0, self.timestamp, df_cons_last_14_days)
-                        return operator_output
+                epsilon = self.determine_epsilon()
+                clustering_labels = self.create_clustering(epsilon)
+                days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
+                df_cons_last_14_days = self.create_df_cons_last_14_days()
+                self.consumption_same_time_window = [data]                 
+                if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
+                    operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days)
+                    return operator_output
                 else:
-                    self.consumption_same_time_window = [data]
+                    operator_output = self.create_output(0, self.timestamp, df_cons_last_14_days)
+                    return operator_output
     
     def create_df_cons_last_14_days(self):
         days = [timestamp.date() for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
@@ -216,13 +228,17 @@ class Operator(OperatorBase):
             message = ""
         elif anomaly == 1:
             message = f"In der Zeit zwischen {str(self.last_time_window_start)} und {str(self.current_time_window_start)} wurde ungewöhnlich wenig verbraucht."
-        {
+        return {
                     "value": anomaly,
                     "timestamp": str(timestamp),
                     "message": message,
                     "last_consumptions": df_cons_last_14_days,
                     "time_window": f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'
         }
+    
+    def stop(self):
+        super().stop()
+        save(self.data_path, self.data_history_file, self.data_history)
     
 from operator_lib.operator_lib import OperatorLib
 if __name__ == "__main__":
