@@ -16,7 +16,7 @@
 
 __all__ = ("Operator", )
 
-from operator_lib.util import OperatorBase
+from operator_lib.util import OperatorBase, logger
 import pandas as pd
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -156,7 +156,7 @@ class Operator(OperatorBase):
         quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]],0.05)
         anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i][1] < quantile]
         if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:])-1 in anomalous_indices_low:
-            print(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
+            logger.warning(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
             self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1])
         with open(self.time_window_consumption_list_dict_anomaly_file_path, 'wb') as f:
             pickle.dump(self.time_window_consumption_list_dict_anomalies,f)
@@ -169,7 +169,7 @@ class Operator(OperatorBase):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
         if pd.Timestamp.now() - self.timestamp > pd.Timedelta(157,'d'):
             return
-        print('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
+        logger.debug('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         if list(self.data_history.index) and self.timestamp <= self.data_history.index[-1]:
             return
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
@@ -178,16 +178,14 @@ class Operator(OperatorBase):
                 with open(f'{self.data_path}/time_window_consumption_list_dict_{str(self.timestamp.date())}.pickle', 'wb') as f:
                     pickle.dump(self.time_window_consumption_list_dict, f)
                 self.update_time_window_data()
-                print(self.window_boundaries_times)
+                logger.debug(self.window_boundaries_times)
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
-            operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
         elif self.consumption_same_time_window != []:
             self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
-                operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
             else:
                 self.consumption_same_time_window.append(data) #!!! Otherwise I lose energy which is consumed between two consecutive windows.
                 self.update_time_window_consumption_list_dict()
@@ -197,17 +195,35 @@ class Operator(OperatorBase):
                     epsilon = self.determine_epsilon()
                     clustering_labels = self.create_clustering(epsilon)
                     days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
+                    df_cons_last_14_days = self.create_df_cons_last_14_days()
                     self.consumption_same_time_window = [data]                 
                     if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
-                        operator_output = {'value': 1, 'timestamp': str(self.timestamp)} 
+                        operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days)
                         return operator_output
                     else:
-                        operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
+                        operator_output = self.create_output(0, self.timestamp, df_cons_last_14_days)
+                        return operator_output
                 else:
-                    self.consumption_same_time_window = [data] 
-                    operator_output = {'value': 0, 'timestamp': str(self.timestamp)}
-        
-        return operator_output
+                    self.consumption_same_time_window = [data]
+    
+    def create_df_cons_last_14_days(self):
+        days = [timestamp.date() for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
+        time_window_consumptions = [consumption for _, consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
+        df = pd.DataFrame(time_window_consumptions, index=days)
+        return df.reset_index(inplace=True).to_json(orient="values")
+    
+    def create_output(self, anomaly, timestamp, df_cons_last_14_days):
+        if anomaly == 0:
+            message = ""
+        elif anomaly == 1:
+            message = f"In der Zeit zwischen {str(self.last_time_window_start)} und {str(self.current_time_window_start)} wurde ungewöhnlich wenig verbraucht."
+        {
+                    "value": anomaly,
+                    "timestamp": str(timestamp),
+                    "message": message,
+                    "last_consumptions": df_cons_last_14_days,
+                    "time_window": f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'
+        }
     
 from operator_lib.operator_lib import OperatorLib
 if __name__ == "__main__":
