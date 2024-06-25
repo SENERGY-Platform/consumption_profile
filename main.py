@@ -217,8 +217,11 @@ class Operator(OperatorBase):
     
     def create_df_cons_last_14_days(self):
         days = [timestamp.date() for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
+        print(f"Days: {days}")
         time_window_consumptions = [consumption for _, consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
+        print(f"Time Window Consumptions: {time_window_consumptions}")
         df = pd.DataFrame(time_window_consumptions, index=days)
+        print(f"Df: {df}")
         return df.reset_index(inplace=True).to_json(orient="values")
     
     def create_output(self, anomaly, timestamp, df_cons_last_14_days):
