@@ -138,6 +138,7 @@ class Operator(OperatorBase):
                 # to be added.
                 last_entry_for_current_time_window = self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1]
                 self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1] = (self.timestamp, last_entry_for_current_time_window[1]+overall_time_window_consumption)
+                self.time_window_data_just_updated = False
         save(self.data_path, "time_window_consumption_list_dict.pickle", self.time_window_consumption_list_dict)
         return
 
@@ -204,8 +205,6 @@ class Operator(OperatorBase):
             self.time_window_data_just_updated = True
             logger.debug(self.window_boundaries_times)
             self.consumption_same_time_window = []
-        else:
-            self.time_window_data_just_updated = False
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
