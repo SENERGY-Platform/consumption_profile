@@ -167,8 +167,6 @@ class Operator(OperatorBase):
             self.first_data_time = self.timestamp
             self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
             save(self.data_path, "first_data_time.pickle", self.first_data_time)
-        if pd.Timestamp.now() - self.timestamp > pd.Timedelta(100,'d'):
-            return
         logger.debug('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
 
