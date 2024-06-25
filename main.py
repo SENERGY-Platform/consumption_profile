@@ -54,6 +54,8 @@ class Operator(OperatorBase):
         self.data_path = self.config.data_path
         self.first_data_time = load(self.config.data_path, "first_data_time.pickle")
 
+        self.time_window_data_just_updated = None
+
 
 
         self.init_phase_duration = pd.Timedelta(self.config.init_phase_length, self.config.init_phase_level)
@@ -128,7 +130,14 @@ class Operator(OperatorBase):
         time_window_consumption_min = float(self.consumption_same_time_window[0]['Consumption'])
         overall_time_window_consumption = 1000*(time_window_consumption_max-time_window_consumption_min)
         if np.isnan(overall_time_window_consumption)==False and overall_time_window_consumption >= 0:
-            self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.timestamp, overall_time_window_consumption))
+            if self.time_window_data_just_updated == False:
+                self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.timestamp, overall_time_window_consumption))
+            elif self.time_window_data_just_updated == True:
+                # If in the current time window the time_window_data was updated there is already an entry for the current time window from the current day. The consumption
+                # that is stored there depicts the consumption from the window until the point of time_window_data updating. The rest of the consumption during the window has just
+                # to be added.
+                last_entry_for_current_time_window = self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1]
+                self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1] = (self.timestamp, last_entry_for_current_time_window[1]+overall_time_window_consumption)
         save(self.data_path, "time_window_consumption_list_dict.pickle", self.time_window_consumption_list_dict)
         return
 
@@ -190,9 +199,13 @@ class Operator(OperatorBase):
         if self.init_phase_handler.init_phase_needs_to_be_reset():
             return self.init_phase_handler.reset_init_phase(init_value)
 
-        if not self.time_window_consumption_list_dict or self.timestamp.is_month_end:# Update time window data right after inital phase and then after each month.
+        if not self.time_window_consumption_list_dict or (self.timestamp.is_month_end and self.timestamp.date() > self.data_history.index[-2].date()):# Update time window data right after inital phase and then after each month.
             self.update_time_window_data()
+            self.time_window_data_just_updated = True
             logger.debug(self.window_boundaries_times)
+            self.consumption_same_time_window = []
+        else:
+            self.time_window_data_just_updated = False
         self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
