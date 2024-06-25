@@ -234,7 +234,7 @@ class Operator(OperatorBase):
         print(f"Time Window Consumptions: {time_window_consumptions}")
         df = pd.DataFrame(time_window_consumptions, index=days)
         print(f"Df: {df}")
-        return df.reset_index(inplace=True).to_json(orient="values")
+        return df.reset_index(inplace=False).to_json(orient="values")
     
     def create_output(self, anomaly, timestamp, df_cons_last_14_days):
         if anomaly == 0:
