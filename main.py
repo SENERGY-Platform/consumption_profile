@@ -161,7 +161,7 @@ class Operator(OperatorBase):
 
         return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low]
     
-    def run(self, data, selector='energy_func',topic=''):
+    def run(self, data, selector='energy_func',device_id=''):
         self.timestamp = self.todatetime(data['Time']).tz_localize(None)
         if not self.first_data_time:
             self.first_data_time = self.timestamp
@@ -238,7 +238,7 @@ class Operator(OperatorBase):
     
     def stop(self):
         super().stop()
-        save(self.data_path, self.data_history_file, self.data_history)
+        save(self.data_path, "data_history.pickle", self.data_history)
     
 from operator_lib.operator_lib import OperatorLib
 if __name__ == "__main__":
