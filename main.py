@@ -170,7 +170,7 @@ class Operator(OperatorBase):
         logger.debug('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
 
-        if list(self.data_history.index) and self.timestamp <= self.data_history.index[-2]: # Discard points that come in wrong order wrt time.
+        if len(self.data_history.index) >= 2 and self.timestamp <= self.data_history.index[-2]: # Discard points that come in wrong order wrt time.
             return
         
         operator_is_init = self.init_phase_handler.operator_is_in_init_phase(self.timestamp)
