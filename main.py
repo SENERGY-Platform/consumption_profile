@@ -73,25 +73,15 @@ class Operator(OperatorBase):
         if not os.path.exists(self.data_path):
             os.mkdir(self.data_path)
 
-        self.time_window_consumption_list_dict = defaultdict(list)
-        self.time_window_consumption_list_dict_anomalies = defaultdict(list)
-        self.data_history = pd.Series([], index=[],dtype=object)
-
-
-        self.window_boundaries_times =  [datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0), 
-                                         datetime.time(18, 0), datetime.time(21, 0)]
-                                      
-
-
-
         self.consumption_same_time_window = []
 
         self.time_window_consumption_clustering = {}
         
-        self.window_boundaries_times = load(self.data_path, 'window_boundaries_times.pickle')
-        self.data_history = load(self.data_path, "data_history.pickle")
-        self.time_window_consumption_list_dict = load(self.data_path, "time_window_consumption_list_dict.pickle")
-        self.time_window_consumption_list_dict_anomalies = load(self.data_path, "time_window_consumption_list_dict_anomaly.pickle")
+        self.window_boundaries_times = load(self.data_path, 'window_boundaries_times.pickle', default=[datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0), 
+                                         datetime.time(18, 0), datetime.time(21, 0)])
+        self.data_history = load(self.data_path, "data_history.pickle", default=pd.Series([], index=[],dtype=object))
+        self.time_window_consumption_list_dict = load(self.data_path, "time_window_consumption_list_dict.pickle", default=defaultdict(list))
+        self.time_window_consumption_list_dict_anomalies = load(self.data_path, "time_window_consumption_list_dict_anomaly.pickle", default=defaultdict(list))
         
 
     def todatetime(self, timestamp):
