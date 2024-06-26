@@ -132,7 +132,12 @@ class Operator(OperatorBase):
         return
 
     def determine_epsilon(self):
-        neighbors = NearestNeighbors(n_neighbors=10)
+        for i in range(10):
+            try:
+                neighbors = NearestNeighbors(n_neighbors=10-i)
+                break
+            except:
+                logger.debug("Not enough samples for nearest neighnours!")
         neighbors_fit = neighbors.fit(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
         distances, _ = neighbors_fit.kneighbors(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
         distances = np.sort(distances, axis=0)
