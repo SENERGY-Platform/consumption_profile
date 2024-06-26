@@ -39,7 +39,7 @@ def compute_time_window_consumptions(list_of_time_windows):
 
 
 def window_determination(data_series):
-    resampled_data_series = data_series.resample('s').interpolate().resample('T').asfreq().bfill()
+    resampled_data_series = data_series.resample('s').interpolate().resample('T').asfreq().dropna()
     clean_data_series = resampled_data_series[~resampled_data_series.index.duplicated(keep='first')]
     grouped_ten_min = create_daily_ten_min_groups(clean_data_series)
     # Each object in the list grouped_ten_min contains the data from data_series from a single day grouped into slots of ten minutes.
