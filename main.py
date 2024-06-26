@@ -135,11 +135,11 @@ class Operator(OperatorBase):
         for i in range(10):
             try:
                 neighbors = NearestNeighbors(n_neighbors=10-i)
+                neighbors_fit = neighbors.fit(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
+                distances, _ = neighbors_fit.kneighbors(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
                 break
             except:
                 logger.debug("Not enough samples for nearest neighnours!")
-        neighbors_fit = neighbors.fit(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
-        distances, _ = neighbors_fit.kneighbors(np.array([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]).reshape(-1,1))
         distances = np.sort(distances, axis=0)
         distances_x = distances[:,1]
         kneedle = kneed.KneeLocator(np.linspace(0,1,len(distances_x)), distances_x, S=0.9, curve="convex", direction="increasing")
