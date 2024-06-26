@@ -51,6 +51,8 @@ class Operator(OperatorBase):
     def init(self,  *args, **kwargs):
         super().init(*args, **kwargs)
         self.data_path = self.config.data_path
+        if not os.path.exists(self.data_path):
+            os.mkdir(self.data_path)
         self.first_data_time = load(self.config.data_path, "first_data_time.pickle")
 
         self.time_window_data_just_updated = None
@@ -68,9 +70,6 @@ class Operator(OperatorBase):
                     "time_window": ""
         }
         self.init_phase_handler.send_first_init_msg(value)
-        
-        if not os.path.exists(self.data_path):
-            os.mkdir(self.data_path)
 
         self.consumption_same_time_window = []
 
