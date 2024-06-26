@@ -25,7 +25,6 @@ from sklearn.cluster import DBSCAN
 import kneed
 import os
 from itertools import chain
-import pickle
 import datetime
 from collections import defaultdict
 from algo import dynamic_window_determination_user_profile as dwdup
@@ -203,6 +202,11 @@ class Operator(OperatorBase):
             self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
+            elif (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > 3*pd.Timedelta(1,'h')) or (  # If the gap between the current and last window boundary is too large 
+                 (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) < 0*pd.Timedelta(1,'h')) and ( # (because for example there were data points missing in the stream) we ignore the current consumption
+                  pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > -21*pd.Timedelta(1,'h'))):   # and start again.
+                self.consumption_same_time_window = [data] 
+                return
             else:
                 self.consumption_same_time_window.append(data) #!!! Otherwise I lose energy which is consumed between two consecutive windows.
                 self.update_time_window_consumption_list_dict()
