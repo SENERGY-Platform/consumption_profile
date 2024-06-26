@@ -16,7 +16,7 @@
 
 __all__ = ("Operator", )
 
-from operator_lib.util import OperatorBase, logger, InitPhase
+from operator_lib.util import OperatorBase, logger, InitPhase, todatetime
 from operator_lib.util.persistence import save, load
 import pandas as pd
 import numpy as np
@@ -80,16 +80,6 @@ class Operator(OperatorBase):
         self.data_history = load(self.data_path, "data_history.pickle", default=pd.Series([], index=[],dtype=object))
         self.time_window_consumption_list_dict = load(self.data_path, "time_window_consumption_list_dict.pickle", default=defaultdict(list))
         self.time_window_consumption_list_dict_anomalies = load(self.data_path, "time_window_consumption_list_dict_anomaly.pickle", default=defaultdict(list))
-        
-
-    def todatetime(self, timestamp):
-        if str(timestamp).isdigit():
-            if len(str(timestamp))==13:
-                return pd.to_datetime(int(timestamp), unit='ms')
-            elif len(str(timestamp))==19:
-                return pd.to_datetime(int(timestamp), unit='ns')
-        else:
-            return pd.to_datetime(timestamp)
 
     def create_new_time_window_consumption_list_dict(self):
         self.time_window_consumption_list_dict = defaultdict(list)
@@ -166,7 +156,7 @@ class Operator(OperatorBase):
         return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low]
     
     def run(self, data, selector='energy_func',device_id=''):
-        self.timestamp = self.todatetime(data['Time']).tz_localize(None)
+        self.timestamp = todatetime(data['Time']).tz_localize(None)
         if not self.first_data_time:
             self.first_data_time = self.timestamp
             self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
@@ -203,7 +193,7 @@ class Operator(OperatorBase):
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
         elif self.consumption_same_time_window != []:
-            self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
+            self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
             elif (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > 3*pd.Timedelta(1,'h')) or (  # If the gap between the current and last window boundary is too large 
