@@ -104,7 +104,7 @@ class Operator(OperatorBase):
         save(self.data_path, "time_window_consumption_list_dict.pickle", self.time_window_consumption_list_dict)
 
     def update_time_window_data(self):
-        self.window_boundaries_times = dwdup.window_determination(self.data_history)
+        self.window_boundaries_times = dwdup.window_determination(self.data_history, self.window_boundaries_times)
         save(self.data_path, 'window_boundaries_times.pickle', self.window_boundaries_times)
         self.create_new_time_window_consumption_list_dict()
 
