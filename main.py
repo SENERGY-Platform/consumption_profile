@@ -168,10 +168,10 @@ class Operator(OperatorBase):
             self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
             save(self.data_path, "first_data_time.pickle", self.first_data_time)
         logger.debug('energy: '+str(data['Consumption'])+'  '+'time: '+str(self.timestamp))
-        self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
 
         if len(self.data_history.index) >= 2 and self.timestamp <= self.data_history.index[-2]: # Discard points that come in wrong order wrt time.
             return
+        self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
         
         operator_is_init = self.init_phase_handler.operator_is_in_init_phase(self.timestamp)
         
