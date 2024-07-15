@@ -16,7 +16,7 @@
 
 __all__ = ("Operator", )
 
-from operator_lib.util import OperatorBase, logger, InitPhase, todatetime
+from operator_lib.util import OperatorBase, logger, InitPhase, todatetime, timestamp_to_str
 from operator_lib.util.persistence import save, load
 import pandas as pd
 import numpy as np
@@ -173,7 +173,7 @@ class Operator(OperatorBase):
         
         init_value = {
                     "value": 0,
-                    "timestamp": str(self.timestamp),
+                    "timestamp": timestamp_to_str(self.timestamp),
                     "message": "",
                     "last_consumptions": "",
                     "time_window": ""
@@ -232,7 +232,7 @@ class Operator(OperatorBase):
             message = f"In der Zeit zwischen {str(self.last_time_window_start)} und {str(self.current_time_window_start)} wurde ungewöhnlich wenig verbraucht."
         return {
                     "value": anomaly,
-                    "timestamp": str(timestamp),
+                    "timestamp": timestamp_to_str(timestamp),
                     "message": message,
                     "last_consumptions": df_cons_last_14_days,
                     "time_window": f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'
