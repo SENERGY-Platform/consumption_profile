@@ -207,7 +207,7 @@ class Operator(OperatorBase):
                 epsilon = self.determine_epsilon()
                 clustering_labels = self.create_clustering(epsilon)
                 days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
-                df_cons_last_14_days = self.create_df_cons_last_14_days()
+                df_cons_last_14_days = self.create_df_cons_last_14_days(days_with_excessive_consumption_during_this_time_window_of_day)
                 self.consumption_same_time_window = [data]                 
                 if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
                     operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days)
@@ -216,13 +216,16 @@ class Operator(OperatorBase):
                     operator_output = self.create_output(0, self.timestamp, df_cons_last_14_days)
                     return operator_output
     
-    def create_df_cons_last_14_days(self):
+    def create_df_cons_last_14_days(self, days_with_excessive_consumption_during_this_time_window_of_day):
         days = [timestamp.date() for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
-        print(f"Days: {days}")
         time_window_consumptions = [consumption for _, consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
-        print(f"Time Window Consumptions: {time_window_consumptions}")
-        df = pd.DataFrame(time_window_consumptions, index=days)
-        print(f"Df: {df}")
+        anomalies_check_list = []
+        for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]:
+            if timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
+                anomalies_check_list.append(1)
+            else:
+                anomalies_check_list.append(0) 
+        df = pd.DataFrame({0:time_window_consumptions, 1:anomalies_check_list}, index=days)
         return df.reset_index(inplace=False).to_json(orient="values")
     
     def create_output(self, anomaly, timestamp, df_cons_last_14_days):
