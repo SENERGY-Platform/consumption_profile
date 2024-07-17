@@ -145,15 +145,20 @@ class Operator(OperatorBase):
     
     def test_time_window_consumption(self, clustering_labels):
         anomalous_indices = np.where(clustering_labels==-1)[0]
-        quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]],0.05)
-        anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i][1] < quantile]
+        low_quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]],0.05)
+        high_quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]],0.95)
+        anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i][1] < low_quantile]
+        anomalous_indices_high = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i][1] > high_quantile]
         if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:])-1 in anomalous_indices_low:
             logger.warning(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
-            print(self.time_window_consumption_list_dict)
-            self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1])
+            self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1], "low"))
+        elif len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:])-1 in anomalous_indices_high:
+            logger.warning(f'In letzter Zeit wurde ungewöhnlich viel verbraucht.')
+            self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1], "high"))
         save(self.data_path, "time_window_consumption_list_dict_anomaly.pickle", self.time_window_consumption_list_dict_anomalies)
 
-        return [self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low]
+        return {"low":[self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low],
+                "high":[self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_high]}
     
     def run(self, data, selector='energy_func',device_id=''):
         self.timestamp = todatetime(data['Time']).tz_localize(None)
@@ -174,7 +179,7 @@ class Operator(OperatorBase):
         init_value = {
                     "value": 0,
                     "timestamp": timestamp_to_str(self.timestamp),
-                    "message": "",
+                    "type": "",
                     "last_consumptions": "",
                     "time_window": ""
         }
@@ -206,37 +211,43 @@ class Operator(OperatorBase):
                 self.update_time_window_consumption_list_dict()
                 epsilon = self.determine_epsilon()
                 clustering_labels = self.create_clustering(epsilon)
-                days_with_excessive_consumption_during_this_time_window_of_day = self.test_time_window_consumption(clustering_labels)
-                df_cons_last_14_days = self.create_df_cons_last_14_days(days_with_excessive_consumption_during_this_time_window_of_day)
+                unusual_consumption_during_this_time_window_of_day_dict = self.test_time_window_consumption(clustering_labels)
+                df_cons_last_14_days = self.create_df_cons_last_14_days(unusual_consumption_during_this_time_window_of_day_dict)
                 self.consumption_same_time_window = [data]                 
-                if self.timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
-                    operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days)
+                if self.timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["low"])):
+                    operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days, "low")
+                    return operator_output
+                elif self.timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["high"])):
+                    operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days, "high")
                     return operator_output
                 else:
-                    operator_output = self.create_output(0, self.timestamp, df_cons_last_14_days)
+                    operator_output = self.create_output(0, self.timestamp, df_cons_last_14_days, "")
                     return operator_output
     
-    def create_df_cons_last_14_days(self, days_with_excessive_consumption_during_this_time_window_of_day):
+    def create_df_cons_last_14_days(self, unusual_consumption_during_this_time_window_of_day_dict):
         days = [timestamp.date() for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
         time_window_consumptions = [consumption for _, consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
         anomalies_check_list = []
         for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]:
-            if timestamp in list(chain.from_iterable(days_with_excessive_consumption_during_this_time_window_of_day)):
+            if [timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["low"]))] or [
+               timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["high"]))]:
                 anomalies_check_list.append(1)
             else:
                 anomalies_check_list.append(0) 
         df = pd.DataFrame({0:time_window_consumptions, 1:anomalies_check_list}, index=days)
         return df.reset_index(inplace=False).to_json(orient="values")
     
-    def create_output(self, anomaly, timestamp, df_cons_last_14_days):
+    def create_output(self, anomaly, timestamp, df_cons_last_14_days, anomaly_type):
         if anomaly == 0:
-            message = ""
-        elif anomaly == 1:
-            message = f"In der Zeit zwischen {str(self.last_time_window_start)} und {str(self.current_time_window_start)} wurde ungewöhnlich wenig verbraucht."
+            type = ""
+        elif anomaly == 1 and anomaly_type == "low":
+            type = "low"
+        elif anomaly == 1 and anomaly_type == "high":
+            type = "high"
         return {
                     "value": anomaly,
                     "timestamp": timestamp_to_str(timestamp),
-                    "message": message,
+                    "type": type,
                     "last_consumptions": df_cons_last_14_days,
                     "time_window": f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'
         }
