@@ -236,6 +236,9 @@ class Operator(OperatorBase):
                 anomalies_check_list.append(1)
             else:
                 anomalies_check_list.append(0) 
+        print(anomalies_check_list)
+        import time
+        time.sleep(3)
         df = pd.DataFrame({0:time_window_consumptions, 1:anomalies_check_list}, index=days)
         return df.reset_index(inplace=False).to_json(orient="values")
     
