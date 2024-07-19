@@ -149,8 +149,6 @@ class Operator(OperatorBase):
         high_quantile = np.quantile([time_window_consumption for _, time_window_consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]],0.95)
         anomalous_indices_low = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i][1] < low_quantile]
         anomalous_indices_high = [i for i in anomalous_indices if self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i][1] > high_quantile]
-        print("Low: "+ str(anomalous_indices_low))
-        print("High: "+ str(anomalous_indices_high))
         if len(self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:])-1 in anomalous_indices_low:
             logger.warning(f'In letzter Zeit wurde ungewöhnlich wenig verbraucht.')
             self.time_window_consumption_list_dict_anomalies[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].append((self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-1], "low"))
@@ -237,11 +235,6 @@ class Operator(OperatorBase):
                 anomalies_check_list.append(1)
             else:
                 anomalies_check_list.append(0) 
-        print(unusual_consumption_during_this_time_window_of_day_dict["low"])
-        print(unusual_consumption_during_this_time_window_of_day_dict["high"])
-        print(anomalies_check_list)
-        import time
-        time.sleep(10)
         df = pd.DataFrame({0:time_window_consumptions, 1:anomalies_check_list}, index=days)
         return df.reset_index(inplace=False).to_json(orient="values")
     
