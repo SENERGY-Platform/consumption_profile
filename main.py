@@ -231,8 +231,9 @@ class Operator(OperatorBase):
         time_window_consumptions = [consumption for _, consumption in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]]
         anomalies_check_list = []
         for timestamp, _ in self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]:
-            if [timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["low"]))] or [
-               timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["high"]))]:
+            if timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["low"])):
+                anomalies_check_list.append(1)
+            elif timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["high"])):
                 anomalies_check_list.append(1)
             else:
                 anomalies_check_list.append(0) 
