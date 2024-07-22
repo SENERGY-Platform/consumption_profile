@@ -65,7 +65,7 @@ class Operator(OperatorBase):
         value = {
                     "value": 0,
                     "timestamp": "",
-                    "message": "",
+                    "type": "",
                     "last_consumptions": "",
                     "time_window": ""
         }
