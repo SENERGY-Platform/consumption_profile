@@ -13,7 +13,7 @@ import pickle
 
 def create_daily_ten_min_groups(data_series):
     grouped_by_day = data_series.groupby(by=lambda x: x.floor('d')) 
-    # Groups the data series by day
+    # Groups the data series by day.
 
     grouped_ten_min = []
     for group in grouped_by_day:
