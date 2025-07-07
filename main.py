@@ -240,7 +240,12 @@ class Operator(OperatorBase):
     
     def create_output(self, anomaly, timestamp, df_cons_last_14_days, anomaly_type):
         if anomaly == 0:
-            type = ""
+            return {
+                    "value": anomaly,
+                    "timestamp": timestamp_to_str(timestamp),
+                    "last_consumptions": df_cons_last_14_days,
+                    "time_window": f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'
+            }
         elif anomaly == 1 and anomaly_type == "low":
             type = "low"
         elif anomaly == 1 and anomaly_type == "high":
