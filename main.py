@@ -28,6 +28,8 @@ from itertools import chain
 import datetime
 from collections import defaultdict
 from algo import dynamic_window_determination_user_profile as dwdup
+import typing
+import datetime
 
 from operator_lib.util import Config
 class CustomConfig(Config):
@@ -160,8 +162,10 @@ class Operator(OperatorBase):
         return {"low":[self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_low],
                 "high":[self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_high]}
     
-    def run(self, data, selector='energy_func',device_id=''):
-        self.timestamp = todatetime(data['Time']).tz_localize(None)
+    def run(self, data: typing.Dict[str, typing.Any], selector: str, device_id, timestamp: datetime.datetime):
+        # Convert to german time and then forget the timezone.
+        self.timestamp = pd.Timestamp(timestamp).tz_localize("Zulu").tz_convert("Europe/Berlin").tz_localize(None)
+        data = {'Consumption': data['Consumption'], 'Time': self.timestamp}
         if not self.first_data_time:
             self.first_data_time = self.timestamp
             self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
@@ -198,7 +202,7 @@ class Operator(OperatorBase):
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
         elif self.consumption_same_time_window != []:
-            self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=todatetime(self.consumption_same_time_window[-1]['Time']).tz_localize(None).time())
+            self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.consumption_same_time_window[-1]['Time'].time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
             elif (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > 3*pd.Timedelta(1,'h')) or (  # If the gap between the current and last window boundary is too large 
