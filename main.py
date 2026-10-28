@@ -163,8 +163,10 @@ class Operator(OperatorBase):
                 "high":[self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:][i] for i in anomalous_indices_high]}
     
     def run(self, data: typing.Dict[str, typing.Any], selector: str, device_id, timestamp: datetime.datetime):
-        # Convert to german time and then forget the timezone.
-        self.timestamp = pd.Timestamp(timestamp).tz_convert("Europe/Berlin").tz_localize(None)
+        # Convert to german time and then forget the timezone. The time windows are of the local
+        # day; the output carries the UTC time, since the export reads it as UTC.
+        utc = pd.Timestamp(timestamp).tz_convert("UTC")
+        self.timestamp = utc.tz_convert("Europe/Berlin").tz_localize(None)
         data = {'Consumption': data['Consumption'], 'Time': self.timestamp}
         if not self.first_data_time:
             self.first_data_time = self.timestamp
@@ -182,7 +184,7 @@ class Operator(OperatorBase):
         
         init_value = {
                     "value": 0,
-                    "timestamp": timestamp_to_str(self.timestamp),
+                    "timestamp": timestamp_to_str(utc),
                     "type": "",
                     "last_consumptions": "",
                     "time_window": ""
@@ -219,13 +221,13 @@ class Operator(OperatorBase):
                 df_cons_last_14_days = self.create_df_cons_last_14_days(unusual_consumption_during_this_time_window_of_day_dict)
                 self.consumption_same_time_window = [data]                 
                 if self.timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["low"])):
-                    operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days, "low")
+                    operator_output = self.create_output(1, utc, df_cons_last_14_days, "low")
                     return operator_output
                 elif self.timestamp in list(chain.from_iterable(unusual_consumption_during_this_time_window_of_day_dict["high"])):
-                    operator_output = self.create_output(1, self.timestamp, df_cons_last_14_days, "high")
+                    operator_output = self.create_output(1, utc, df_cons_last_14_days, "high")
                     return operator_output
                 else:
-                    operator_output = self.create_output(0, self.timestamp, df_cons_last_14_days, "")
+                    operator_output = self.create_output(0, utc, df_cons_last_14_days, "")
                     return operator_output
     
     def create_df_cons_last_14_days(self, unusual_consumption_during_this_time_window_of_day_dict):
