@@ -6,35 +6,21 @@ The other input is a pandas timedelta object that depicts the minimum time windo
 
 import pandas as pd
 import numpy as np
-from collections import defaultdict
 from scipy.signal import savgol_filter, find_peaks
 import math
 
-def create_daily_ten_min_groups(data_series):
-    grouped_by_day = data_series.groupby(by=lambda x: x.floor('d')) 
-    # Groups the data series by day.
+def compute_ten_min_consumptions(data_series):
+    slots = data_series.index.floor('10T')
+    first = data_series.groupby(slots).head(1)
+    last = data_series.groupby(slots).tail(1)
+    consumptions = pd.Series(1000*(last.to_numpy()-first.to_numpy()), index=first.index.floor('10T'))
+    # The consumption within a ten-minute slot is the difference between its last and its first value.
 
-    grouped_ten_min = []
-    for group in grouped_by_day:
-        grouped_ten_min.append(group[1].groupby(pd.Grouper(freq='10T')))
-    
-    return grouped_ten_min
+    consumptions = consumptions[consumptions.groupby(consumptions.index.floor('d')).transform('size') == 144]
+    # Days with less than 144 slots are left out.
 
-def compute_time_window_consumptions(list_of_time_windows):
-    consumption_series_list_time_window = []
-    for day in list_of_time_windows:
-        time_window_data = []
-        for window in day:
-            if list(window)!=[]:
-                time_window_data.append(1000*(window.iloc[-1]-window.iloc[0]))
-        consumption_series_list_time_window.append(pd.Series(data=time_window_data, index=[window.index[0].floor('10T') for window in day if list(window)!=[]]))
-
-    for i, series in reversed(list(enumerate(consumption_series_list_time_window))):
-        if len(series) != 144:
-            del consumption_series_list_time_window[i]
-    # The series with less than 144 entries in the list consumption_series_list_ten_min got deleted.
-
-    return consumption_series_list_time_window
+    return pd.DataFrame({'day': consumptions.index.date, 'slot': consumptions.index.time, 'consumption': consumptions.to_numpy()}).pivot(
+        index='day', columns='slot', values='consumption')
 
 
 def window_determination(data_series, window_boundaries_times):
@@ -43,22 +29,7 @@ def window_determination(data_series, window_boundaries_times):
     except:
         return window_boundaries_times
     clean_data_series = resampled_data_series[~resampled_data_series.index.duplicated(keep='first')]
-    grouped_ten_min = create_daily_ten_min_groups(clean_data_series)
-    # Each object in the list grouped_ten_min contains the data from data_series from a single day grouped into slots of ten minutes.
-    grouped_ten_min_list = [[group[1] for group in day] for day in grouped_ten_min]
-    
-    consumption_series_list_ten_min =  compute_time_window_consumptions(grouped_ten_min_list)                                    
-    # Each object in the list consumption_series_list_ten_min contains a pandas series in which for a single day the consumption within the 10-minutes time slots is stored.
-    # I.e. each pandas series in this list has 24*(60/10)=24*6=144 entries if the data is clean. The series with less entries get ignored.
-
-    
-    index = [series.index[0].date() for series in consumption_series_list_ten_min] # This just a list which contains the days.
-
-    aux_dict = defaultdict(list)
-    for series in consumption_series_list_ten_min:
-        for timestamp in list(series.index):
-            aux_dict[timestamp.time()].append(series.loc[timestamp])
-    df = pd.DataFrame(data=aux_dict, index=index)
+    df = compute_ten_min_consumptions(clean_data_series)
     # The pandas dataframe df has the days as indices and the 144 10min time slots in a day as columns. The entries are the consumption from the respective day in the 
     # respective time slot.
 
