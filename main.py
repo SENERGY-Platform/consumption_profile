@@ -49,6 +49,8 @@ class CustomConfig(Config):
 
 class Operator(OperatorBase):
     configType = CustomConfig
+    # The time windows are determined from this much history; older values are dropped then.
+    history_length = pd.Timedelta(90, 'd')
 
     def init(self,  *args, **kwargs):
         super().init(*args, **kwargs)
@@ -95,6 +97,7 @@ class Operator(OperatorBase):
         save(self.data_path, "time_window_consumption_list_dict.pickle", self.time_window_consumption_list_dict)
 
     def update_time_window_data(self):
+        self.data_history = self.data_history[self.timestamp-self.history_length:]
         self.window_boundaries_times = dwdup.window_determination(self.data_history, self.window_boundaries_times)
         save(self.data_path, 'window_boundaries_times.pickle', self.window_boundaries_times)
         self.create_new_time_window_consumption_list_dict()
@@ -182,6 +185,9 @@ class Operator(OperatorBase):
         if len(self.data_history.index) >= 1 and self.timestamp <= self.data_history.index[-1]: # Discard points that come in wrong order wrt time.
             return
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
+        if len(self.data_history.index) < 2 or self.timestamp.floor('h') != self.data_history.index[-2].floor('h'):
+            # Once an hour and not only in stop, so that a crash loses at most the history of the current hour.
+            save(self.data_path, "data_history.pickle", self.data_history)
         
         operator_is_init = self.init_phase_handler.operator_is_in_init_phase(self.timestamp)
         
