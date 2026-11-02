@@ -50,6 +50,24 @@ class TestTenMinuteConsumptions(unittest.TestCase):
         self.assertEqual([datetime.date(2026, 3, 3), datetime.date(2026, 3, 4)], list(frame.index))
 
 
+class TestWindowDivision(unittest.TestCase):
+    def consumptions(self, series):
+        return {name: 1000 * (window.iloc[-1] - window.iloc[0]) if len(window) else None
+                for name, window in dwdup.window_division(DEFAULT_BOUNDARIES, series)[0]}
+
+    def test_ends_the_last_window_of_a_day_at_the_first_value_of_the_next(self):
+        index = pd.date_range("2026-03-02 00:00:30", periods=2 * 288, freq="5min")
+        consumptions = self.consumptions(pd.Series(np.arange(len(index)) * 0.25, index=index))
+        # as every other window, which ends at the first value of the window after it
+        self.assertEqual(consumptions["18:00:00-21:00:00"], consumptions["21:00:00-00:00:00"])
+
+    def test_leaves_the_last_window_empty_when_the_day_has_no_values_in_it(self):
+        index = pd.date_range("2026-03-02 00:00:30", periods=2 * 288, freq="5min")
+        series = pd.Series(np.arange(len(index)) * 0.25, index=index)
+        series = series.drop(series["2026-03-02 21:00":"2026-03-02 23:59"].index)
+        self.assertIsNone(self.consumptions(series)["21:00:00-00:00:00"])
+
+
 class TestWindowDetermination(unittest.TestCase):
     def test_finds_the_boundaries_of_a_month_with_partial_days_and_a_gap(self):
         history = meter("2026-03-02 07:23", 30)

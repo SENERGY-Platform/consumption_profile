@@ -120,7 +120,11 @@ def window_division(list_of_timestamps, data_series):
                 divided_data_for_one_day.append((f'{str(time)}-{list_of_timestamps[i+1]}', aux_series_start))
             else:
                 divided_data_for_one_day.append((f'{str(time)}-{list_of_timestamps[i+1]}', pd.Series([], dtype=object)))
-        divided_data_for_one_day.append((f'{list_of_timestamps[-1]}-00:00:00', data_of_one_day[group[1].index[0].floor('d')+pd.Timedelta(str(list_of_timestamps[i+1])):])) # Here we lose information about consumption between last total of last day and first total of new day. TODO!
+        last_window = data_of_one_day[group[1].index[0].floor('d')+pd.Timedelta(str(list_of_timestamps[i+1])):]
+        if len(last_window) > 0:
+            # Like every other window, the last one ends at the first value after it, here the first one of the next day.
+            last_window = pd.concat([last_window, data_series[group[1].index[0].floor('d')+pd.Timedelta(1,'d'):].iloc[0:1]])
+        divided_data_for_one_day.append((f'{list_of_timestamps[-1]}-00:00:00', last_window))
         grouped_wrt_timestamps.append(divided_data_for_one_day)
     #print(grouped_wrt_timestamps) 
     return grouped_wrt_timestamps
