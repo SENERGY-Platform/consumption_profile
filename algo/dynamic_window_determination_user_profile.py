@@ -9,7 +9,6 @@ import numpy as np
 from collections import defaultdict
 from scipy.signal import savgol_filter, find_peaks
 import math
-import pickle
 
 def create_daily_ten_min_groups(data_series):
     grouped_by_day = data_series.groupby(by=lambda x: x.floor('d')) 
@@ -71,10 +70,6 @@ def window_determination(data_series, window_boundaries_times):
 
     smooth_scaled_mean_array = savgol_filter(scaled_mean_array, 20, 2)
     smoothed_mean_list = smooth_scaled_mean_array.tolist()
-    with open(f"/opt/data/curve_{str(pd.Timestamp.now())}", "wb") as f:
-        pickle.dump(scaled_mean_array, f)
-    with open(f"/opt/data/smoothe_curve_{str(pd.Timestamp.now())}", "wb") as f:
-        pickle.dump(scaled_mean_array, f)
     # As a next step we smoothen the arrays and convert them to lists.
 
     prominence = float(max(smooth_scaled_mean_array))/float(25) # This is kind of random here!?
@@ -84,8 +79,6 @@ def window_determination(data_series, window_boundaries_times):
     # We use these information now to divide the time line into windows (we add the start of the day to the list, i.e. 0).
 
     window_boundaries_points = sorted(list(set([0]+list(properties_mean['left_bases'])+list(properties_mean['right_bases']))))
-    with open(f"/opt/data/window_boundary_points_{str(pd.Timestamp.now())}", "wb") as f:
-        pickle.dump(window_boundaries_points, f)
 
     # Now we check if boundary point are too close together (i.e. closer than 0.5 hour):
 
@@ -128,15 +121,6 @@ def window_determination(data_series, window_boundaries_times):
             new_window_boundary_times += aux
 
     window_boundaries_times = sorted(list(set(new_window_boundary_times)))
-
-    with open('window_boundaries.txt', 'a') as f:
-        for time in window_boundaries_times:
-            f.write(str(time)+', ')
-
-        f.write('\n\n')
-            
-
-
 
     return window_boundaries_times
 
