@@ -9,6 +9,14 @@ import numpy as np
 from scipy.signal import savgol_filter, find_peaks
 import math
 
+WEEKDAY = 'weekday'
+WEEKEND = 'weekend'
+DAY_TYPES = (WEEKDAY, WEEKEND)
+# Weekdays and weekends have time windows of their own and are only compared with days of the same type.
+
+def type_of_day(day):
+    return WEEKEND if day.weekday() >= 5 else WEEKDAY
+
 def compute_ten_min_consumptions(data_series):
     slots = data_series.index.floor('10T')
     first = data_series.groupby(slots).head(1)
@@ -23,15 +31,22 @@ def compute_ten_min_consumptions(data_series):
         index='day', columns='slot', values='consumption')
 
 
-def window_determination(data_series, window_boundaries_times):
+def window_determination(data_series, window_boundaries_times, day_type=None):
     try:
         resampled_data_series = data_series.resample('T').bfill()
     except:
         return window_boundaries_times
     clean_data_series = resampled_data_series[~resampled_data_series.index.duplicated(keep='first')]
     df = compute_ten_min_consumptions(clean_data_series)
-    # The pandas dataframe df has the days as indices and the 144 10min time slots in a day as columns. The entries are the consumption from the respective day in the 
+    # The pandas dataframe df has the days as indices and the 144 10min time slots in a day as columns. The entries are the consumption from the respective day in the
     # respective time slot.
+
+    if day_type is not None:
+        df = df[[type_of_day(day) == day_type for day in df.index]]
+    # Only the days of the given type count. They are selected only here, since the series without the other days would have
+    # gaps that the resampling fills with consumption.
+    if df.empty:
+        return window_boundaries_times
 
     df[df<0]=np.nan
     # Here we discard negative values in the dataframe. Negative values do not make sense and can only occure through wrong data.
@@ -97,8 +112,8 @@ def window_determination(data_series, window_boundaries_times):
 
 
 '''The input is a list of pd.Timestamp.time() objects and the input is a pandas data series indexed over pd.Timestamps with values given by certain consumption values. 
-The first entry of the list is 00:00:00 and the last entry is 24:00:00. The output is given by a list with the following properties: Each entry consists of a collection
-of pandas data series which corresponds to the consumption data of one day divided with respect to the list of times given as input.'''
+The first entry of the list is 00:00:00 and the last entry is 24:00:00. The output is given by a list with the following properties: Each entry consists of the day and a collection
+of pandas data series which corresponds to the consumption data of that day divided with respect to the list of times given as input.'''
     
 def window_division(list_of_timestamps, data_series):
     daily_groups=data_series.groupby(by=lambda x: x.floor('d'))
@@ -125,7 +140,7 @@ def window_division(list_of_timestamps, data_series):
             # Like every other window, the last one ends at the first value after it, here the first one of the next day.
             last_window = pd.concat([last_window, data_series[group[1].index[0].floor('d')+pd.Timedelta(1,'d'):].iloc[0:1]])
         divided_data_for_one_day.append((f'{list_of_timestamps[-1]}-00:00:00', last_window))
-        grouped_wrt_timestamps.append(divided_data_for_one_day)
+        grouped_wrt_timestamps.append((group[0], divided_data_for_one_day))
     #print(grouped_wrt_timestamps) 
     return grouped_wrt_timestamps
     

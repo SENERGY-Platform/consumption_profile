@@ -86,26 +86,30 @@ class Operator(OperatorBase):
 
         self.consumption_same_time_window = []
 
-        self.window_boundaries_times = load(self.data_path, 'window_boundaries_times.pickle', default=[datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0), 
-                                         datetime.time(18, 0), datetime.time(21, 0)])
+        # Both per type of day. Files of their own, since the earlier files hold other entries; without them the windows
+        # are rebuilt from the history on the first message.
+        self.window_boundaries = load(self.data_path, 'window_boundaries_by_day_type.pickle', default={day_type: [datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0),
+                                         datetime.time(18, 0), datetime.time(21, 0)] for day_type in dwdup.DAY_TYPES})
         self.data_history = load(self.data_path, "data_history.pickle", default=pd.Series([], index=[],dtype=object))
-        # (time, consumption, judgement) per window. A file of its own, since the earlier file holds pairs; without
-        # it the windows are rebuilt from the history on the first message.
-        self.time_window_consumption_list_dict = load(self.data_path, "time_window_consumptions.pickle", default=defaultdict(list))
+        # (time, consumption, judgement) per (type of day, window).
+        self.time_window_consumption_list_dict = load(self.data_path, "time_window_consumptions_by_day_type.pickle", default=defaultdict(list))
 
     def create_new_time_window_consumption_list_dict(self):
         self.time_window_consumption_list_dict = defaultdict(list)
-        list_of_time_windows = dwdup.window_division(self.window_boundaries_times, self.data_history[(self.timestamp-pd.Timedelta(14,'d')).floor('d'):])
-        for day in list_of_time_windows:
-            for window_name, window in day:
-                if list(window)!=[]:
-                    overall_time_window_consumption = 1000*(window.iloc[-1]-window.iloc[0])
-                    if overall_time_window_consumption>=0:
-                        self.append_judged(window_name, window.index[-1], overall_time_window_consumption)
-        save(self.data_path, "time_window_consumptions.pickle", self.time_window_consumption_list_dict)
+        # From the whole history, since 14 weekend days span seven weeks.
+        for day_type in dwdup.DAY_TYPES:
+            for day, windows in dwdup.window_division(self.window_boundaries[day_type], self.data_history):
+                if dwdup.type_of_day(day) != day_type:
+                    continue
+                for window_name, window in windows:
+                    if list(window)!=[]:
+                        overall_time_window_consumption = 1000*(window.iloc[-1]-window.iloc[0])
+                        if overall_time_window_consumption>=0:
+                            self.append_judged((day_type, window_name), window.index[-1], overall_time_window_consumption)
+        save(self.data_path, "time_window_consumptions_by_day_type.pickle", self.time_window_consumption_list_dict)
 
-    def append_judged(self, window_name, time, consumption):
-        entries = self.time_window_consumption_list_dict[window_name]
+    def append_judged(self, window, time, consumption):
+        entries = self.time_window_consumption_list_dict[window]
         judgement, deviation = judge([earlier for _, earlier, _ in entries[-14:]], consumption,
                                      self.config.mad_factor, self.config.min_deviation_percent)
         entries.append((time, consumption, judgement))
@@ -113,8 +117,9 @@ class Operator(OperatorBase):
 
     def update_time_window_data(self):
         self.data_history = self.data_history[self.timestamp-self.history_length:]
-        self.window_boundaries_times = dwdup.window_determination(self.data_history, self.window_boundaries_times)
-        save(self.data_path, 'window_boundaries_times.pickle', self.window_boundaries_times)
+        for day_type in dwdup.DAY_TYPES:
+            self.window_boundaries[day_type] = dwdup.window_determination(self.data_history, self.window_boundaries[day_type], day_type)
+        save(self.data_path, 'window_boundaries_by_day_type.pickle', self.window_boundaries)
         self.create_new_time_window_consumption_list_dict()
 
     def update_time_window_consumption_list_dict(self):
@@ -135,15 +140,15 @@ class Operator(OperatorBase):
         judged = None
         if np.isnan(overall_time_window_consumption)==False and overall_time_window_consumption >= 0:
             if self.time_window_data_just_updated == False:
-                judged = self.append_judged(f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}', self.timestamp, overall_time_window_consumption)
+                judged = self.append_judged(self.completed_window, self.timestamp, overall_time_window_consumption)
             elif self.time_window_data_just_updated == True:
                 # If in the current time window the time_window_data was updated there is already an entry for the current time window from the current day. The consumption
                 # that is stored there depicts the consumption from the window until the point of time_window_data updating. The rest of the consumption during the window has just
                 # to be added.
-                _, consumption_before_update, _ = self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'].pop()
-                judged = self.append_judged(f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}', self.timestamp, consumption_before_update+overall_time_window_consumption)
+                _, consumption_before_update, _ = self.time_window_consumption_list_dict[self.completed_window].pop()
+                judged = self.append_judged(self.completed_window, self.timestamp, consumption_before_update+overall_time_window_consumption)
                 self.time_window_data_just_updated = False
-        save(self.data_path, "time_window_consumptions.pickle", self.time_window_consumption_list_dict)
+        save(self.data_path, "time_window_consumptions_by_day_type.pickle", self.time_window_consumption_list_dict)
         return judged
 
     def run(self, data: typing.Dict[str, typing.Any], selector: str, device_id, timestamp: datetime.datetime):
@@ -185,13 +190,14 @@ class Operator(OperatorBase):
         if not self.time_window_consumption_list_dict or (self.timestamp.is_month_end and self.timestamp.date() > self.data_history.index[-2].date()):# Update time window data right after inital phase and then after each month.
             self.update_time_window_data()
             self.time_window_data_just_updated = True
-            logger.debug(self.window_boundaries_times)
+            logger.debug(self.window_boundaries)
             self.consumption_same_time_window = []
-        self.current_time_window_start = max(time for time in self.window_boundaries_times if time<=self.timestamp.time())
+        self.current_time_window_start = max(time for time in self.window_boundaries[dwdup.type_of_day(self.timestamp)] if time<=self.timestamp.time())
         if self.consumption_same_time_window == []:
             self.consumption_same_time_window.append(data)
         elif self.consumption_same_time_window != []:
-            self.last_time_window_start = max(time for time in self.window_boundaries_times if time<=self.consumption_same_time_window[-1]['Time'].time())
+            previous_time = self.consumption_same_time_window[-1]['Time']
+            self.last_time_window_start = max(time for time in self.window_boundaries[dwdup.type_of_day(previous_time)] if time<=previous_time.time())
             if self.current_time_window_start==self.last_time_window_start:
                 self.consumption_same_time_window.append(data)
             elif (pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > 3*pd.Timedelta(1,'h')) or (  # If the gap between the current and last window boundary is too large 
@@ -201,6 +207,9 @@ class Operator(OperatorBase):
                 return
             else:
                 self.consumption_same_time_window.append(data) #!!! Otherwise I lose energy which is consumed between two consecutive windows.
+                # A window that runs past midnight belongs to the type of the day it started on.
+                self.completed_window = (dwdup.type_of_day(self.consumption_same_time_window[0]['Time']),
+                                         f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}')
                 judgement, deviation = self.update_time_window_consumption_list_dict() or ("", None)
                 self.consumption_same_time_window = [data]
                 if judgement == "low":
@@ -210,7 +219,7 @@ class Operator(OperatorBase):
                 return self.create_output(judgement, deviation, utc, self.create_df_cons_last_14_days())
 
     def create_df_cons_last_14_days(self):
-        entries = self.time_window_consumption_list_dict[f'{str(self.last_time_window_start)}-{str(self.current_time_window_start)}'][-14:]
+        entries = self.time_window_consumption_list_dict[self.completed_window][-14:]
         df = pd.DataFrame({0:[consumption for _, consumption, _ in entries], 1:[1 if judgement else 0 for _, _, judgement in entries]},
                           index=[timestamp.date() for timestamp, _, _ in entries])
         return df.reset_index(inplace=False).to_json(orient="values")

@@ -65,6 +65,18 @@ class TestAlarms(unittest.TestCase):
         outputs = self.days([1.0, 1.0, 0.93, 1.09, 0.96, 0.99, 1.07, 0.98, 1.01, 0.91])
         self.assertEqual({}, self.reported(outputs))
 
+    def weeks(self, last_day_factor):
+        # June 1 to 28, 2026: weekends consume twice as much as weekdays; June 28 is the eighth weekend day
+        factors = [2.0 if datetime.date(2026, 6, day).weekday() >= 5 else 1.0 for day in range(1, 29)]
+        return self.days(factors[:-1] + [last_day_factor])
+
+    def test_does_not_report_weekends_that_consume_as_much_as_earlier_weekends(self):
+        self.assertEqual({}, self.reported(self.weeks(last_day_factor=2.0)))
+
+    def test_reports_a_weekend_day_that_consumes_half_as_much_as_earlier_weekends(self):
+        midday = [r for r in self.weeks(last_day_factor=1.0)[28] if r["time_window"] == "12:00:00-15:00:00"]
+        self.assertEqual([(1, "low", -50.0)], [(r["value"], r.get("type"), r.get("deviation")) for r in midday])
+
     def test_reports_a_day_with_twice_the_usual_consumption_with_its_deviation(self):
         outputs = self.days([1.0] * 9 + [2.0])
         midday = [r for r in outputs[10] if r["time_window"] == "12:00:00-15:00:00"]

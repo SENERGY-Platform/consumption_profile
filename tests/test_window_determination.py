@@ -53,7 +53,7 @@ class TestTenMinuteConsumptions(unittest.TestCase):
 class TestWindowDivision(unittest.TestCase):
     def consumptions(self, series):
         return {name: 1000 * (window.iloc[-1] - window.iloc[0]) if len(window) else None
-                for name, window in dwdup.window_division(DEFAULT_BOUNDARIES, series)[0]}
+                for name, window in dwdup.window_division(DEFAULT_BOUNDARIES, series)[0][1]}
 
     def test_ends_the_last_window_of_a_day_at_the_first_value_of_the_next(self):
         index = pd.date_range("2026-03-02 00:00:30", periods=2 * 288, freq="5min")
@@ -68,7 +68,27 @@ class TestWindowDivision(unittest.TestCase):
         self.assertIsNone(self.consumptions(series)["21:00:00-00:00:00"])
 
 
+def meter_by_day_type(start, days, weekend_peaks):
+    # 5-minute readings of a meter with a morning and an evening peak on weekdays and the given peaks on weekends
+    index = pd.date_range(start, periods=days * 288, freq="5min")
+    hour = np.asarray(index.hour + index.minute / 60)
+    weekend = np.asarray(index.dayofweek >= 5)
+    weekday_rate = 0.08 * np.exp(-(hour - 7) ** 2 / 2) + 0.12 * np.exp(-(hour - 19) ** 2 / 3)
+    weekend_rate = sum(0.1 * np.exp(-(hour - peak) ** 2 / 2) for peak in weekend_peaks)
+    return pd.Series(100 + np.cumsum(0.02 + np.where(weekend, weekend_rate, weekday_rate)), index=index)
+
+
 class TestWindowDetermination(unittest.TestCase):
+    def test_determines_the_boundaries_of_weekdays_from_weekdays_only(self):
+        other_weekends = meter_by_day_type("2026-03-02", 28, weekend_peaks=[3, 12])
+        self.assertEqual(dwdup.window_determination(meter_by_day_type("2026-03-02", 28, weekend_peaks=[10]), DEFAULT_BOUNDARIES, "weekday"),
+                         dwdup.window_determination(other_weekends, DEFAULT_BOUNDARIES, "weekday"))
+
+    def test_determines_the_boundaries_of_weekends_from_weekends_only(self):
+        history = meter_by_day_type("2026-03-02", 28, weekend_peaks=[3, 12])
+        self.assertNotEqual(dwdup.window_determination(history, DEFAULT_BOUNDARIES, "weekday"),
+                            dwdup.window_determination(history, DEFAULT_BOUNDARIES, "weekend"))
+
     def test_finds_the_boundaries_of_a_month_with_partial_days_and_a_gap(self):
         history = meter("2026-03-02 07:23", 30)
         history = history.drop(history["2026-03-10 13:00":"2026-03-10 16:00"].index)

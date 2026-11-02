@@ -59,9 +59,9 @@ class TestHistory(unittest.TestCase):
         self.operator.data_history = history
         self.operator.timestamp = history.index[-1]
         self.operator.update_time_window_data()
-        last_90_days = dwdup.window_determination(history[history.index[-1] - pd.Timedelta(90, "d"):], DEFAULT_BOUNDARIES)
-        self.assertNotEqual(dwdup.window_determination(history, DEFAULT_BOUNDARIES), last_90_days)
-        self.assertEqual(last_90_days, self.operator.window_boundaries_times)
+        last_90_days = dwdup.window_determination(history[history.index[-1] - pd.Timedelta(90, "d"):], DEFAULT_BOUNDARIES, "weekday")
+        self.assertNotEqual(dwdup.window_determination(history, DEFAULT_BOUNDARIES, "weekday"), last_90_days)
+        self.assertEqual(last_90_days, self.operator.window_boundaries["weekday"])
 
     def test_a_crash_loses_at_most_the_history_of_the_current_hour(self):
         at = datetime.datetime(2026, 6, 1, 10, 0, 30, tzinfo=CEST)

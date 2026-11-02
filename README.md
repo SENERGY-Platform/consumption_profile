@@ -34,4 +34,6 @@ Example: If init_phase_length is 14 and init_phase_level is "d" then the initial
 
 ## When a time window is unusual
 
-The consumption during a time window is compared with up to 14 earlier consumptions of the same time window. It is unusual if it lies more than `mad_factor` median absolute deviations (scaled to the standard deviation) away from their median and deviates from the median by at least `min_deviation_percent` percent. In a time window whose median is 0, any consumption is unusually high. With fewer than 7 earlier consumptions nothing is reported.
+Weekdays (Monday to Friday) and weekends have time windows of their own, determined each month from the respective days of the last 90 days. A time window that runs past midnight belongs to the day it started on.
+
+The consumption during a time window is compared with up to 14 earlier consumptions of the same time window on the same type of day. It is unusual if it lies more than `mad_factor` median absolute deviations (scaled to the standard deviation) away from their median and deviates from the median by at least `min_deviation_percent` percent. In a time window whose median is 0, any consumption is unusually high. With fewer than 7 earlier consumptions nothing is reported, so weekends are only judged about four weeks after the initial phase.
