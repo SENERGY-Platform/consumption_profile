@@ -106,6 +106,11 @@ class Operator(OperatorBase):
            ) 
         ):
             return
+        if self.time_window_data_just_updated is None:
+            # init leaves the flag at None: after a restart this window lacks its values from before the
+            # restart, so its consumption would be too low. Only the windows after it are recorded.
+            self.time_window_data_just_updated = False
+            return
         time_window_consumption_max = float(self.consumption_same_time_window[-1]['Consumption'])
         time_window_consumption_min = float(self.consumption_same_time_window[0]['Consumption'])
         overall_time_window_consumption = 1000*(time_window_consumption_max-time_window_consumption_min)
