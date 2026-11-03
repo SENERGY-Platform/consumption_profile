@@ -2,7 +2,7 @@ name: 'PROD build'
 
 # main builds :prod as before plus :vX.Y.Z; a release/vN branch keeps an older major
 # alive and builds only its :vN.x.y. The git tag is pushed after the image, so a failed
-# build never consumes a version.
+# build never consumes a version. Nothing is built unless the tests pass.
 on:
   push:
     branches:
@@ -11,7 +11,22 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test
+        run: python -m unittest discover -s tests
+
   multi:
+    needs: [test]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,6 +35,23 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      # The platform registers a version from the manifest at its tag, so the manifest is
+      # regenerated and committed before the version is computed, built and tagged.
+      - name: Regenerate the operator manifest
+        run: |
+          python -m pip install -r requirements.txt
+          python -m operator_lib manifest main.py
+          if [ -n "$(git status --porcelain -- operator-manifest.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add operator-manifest.json
+            git commit -m 'chore: regenerate the operator manifest [skip ci]'
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
       - name: Version
         id: version
         run: echo "tag=$(.github/scripts/next-version.sh "$GITHUB_REF_NAME")" >> "$GITHUB_OUTPUT"
