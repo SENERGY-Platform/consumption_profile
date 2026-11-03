@@ -2,10 +2,5 @@ git+https://github.com/SENERGY-Platform/analytics-operator-lib-python@v1.13.0
 
 pandas<2
 numpy==1.26.4
-astral
-pytz
 scipy
-tqdm
-similaritymeasures
 pyarrow
-python-dotenv==1.0.0
