@@ -29,8 +29,9 @@ class TestInitialPhase(unittest.TestCase):
         self.sent = []
         self.operator = Operator()
         self.operator.produce = self.sent.append
+        self.operator.data_path = self.dir.name
         self.operator.init(None, None, None, None, None, None,
-                           config=CustomConfig({"data_path": self.dir.name, "init_phase_length": "2",
+                           config=CustomConfig({"init_phase_length": "2",
                                                 "init_phase_level": "d"}))
 
     def tearDown(self):

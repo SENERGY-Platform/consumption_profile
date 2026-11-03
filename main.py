@@ -28,13 +28,14 @@ from algo.judgement import judge
 import typing
 import datetime
 
-from operator_lib.util import Config
+from operator_lib.util import Config, Inputs, Outputs
 class CustomConfig(Config):
-    data_path = "/opt/data"
     init_phase_length: float = 2
     init_phase_level: str = "d"
     mad_factor: float = 3
     min_deviation_percent: float = 25
+    # A field of the library, declared again so that flows can set it.
+    logger_level: str = "warning"
 
     def __init__(self, d, **kwargs):
         super().__init__(d, **kwargs)
@@ -56,17 +57,33 @@ class CustomConfig(Config):
         else:
             self.min_deviation_percent = 25
 
+# The time of a value is the time the platform received it, so there is no input for it.
+class ConsumptionInputs(Inputs):
+    Consumption: float
+
+class ProfileOutputs(Outputs):
+    value: int
+    timestamp: str
+    type: str
+    deviation: float
+    last_consumptions: str
+    time_window: str
+    initial_phase: str
+
 class Operator(OperatorBase):
     configType = CustomConfig
+    inputs = ConsumptionInputs
+    outputs = ProfileOutputs
+    # Where the state is kept, the volume of the deployment; not a config value, which a flow could change.
+    data_path = "/opt/data"
     # The time windows are determined from this much history; older values are dropped then.
     history_length = pd.Timedelta(90, 'd')
 
     def init(self,  *args, **kwargs):
         super().init(*args, **kwargs)
-        self.data_path = self.config.data_path
         if not os.path.exists(self.data_path):
             os.mkdir(self.data_path)
-        self.first_data_time = load(self.config.data_path, "first_data_time.pickle")
+        self.first_data_time = load(self.data_path, "first_data_time.pickle")
 
         self.time_window_data_just_updated = None
 

@@ -44,8 +44,9 @@ class TestRestart(unittest.TestCase):
     def start(self):
         operator = Operator()
         operator.produce = lambda value: None
+        operator.data_path = self.dir.name
         operator.init(None, None, None, None, None, None,
-                      config=CustomConfig({"data_path": self.dir.name, "init_phase_length": "2",
+                      config=CustomConfig({"init_phase_length": "2",
                                            "init_phase_level": "d"}))
         return operator
 

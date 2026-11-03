@@ -3,7 +3,8 @@
 | key                | type | description | 
 |--------------------|------|-------------|   
 | `Consumption`     | float | Numeric value that describes any kind of consumption. |
-| `Time`     | string | Timestamp of consumption value |
+
+The time of a value is the time the platform received it.
 
 
 
@@ -25,12 +26,14 @@
 | key | type | description | 
 |--------------------|-------------|-----------------------------------------------------------| 
 | `logger_level`           | str | default: "warning" |
-| `init_phase_length`           | int |  |
-| `init_phase_level`           | string | |
+| `init_phase_length`           | float | default: 2 |
+| `init_phase_level`           | string | default: "d" |
 | `mad_factor`           | float | default: 3. See below. |
 | `min_deviation_percent`           | float | default: 25. See below. |
 
 Example: If init_phase_length is 14 and init_phase_level is "d" then the initial phase lasts 14 days.
+
+The operator keeps its state in `/opt/data`, which should be a volume. `operator-manifest.json` declares the inputs, outputs and config options; the CI regenerates it from `main.py` before each release.
 
 ## When a time window is unusual
 
