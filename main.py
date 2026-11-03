@@ -74,15 +74,9 @@ class Operator(OperatorBase):
 
         self.init_phase_duration = pd.Timedelta(self.config.init_phase_length, self.config.init_phase_level)
 
+        # No message before the first value: without a time of its own the export drops it, and the end of the
+        # initial phase is not known yet. The first value announces the initial phase.
         self.init_phase_handler = InitPhase(self.data_path, self.init_phase_duration, self.first_data_time, self.produce)
-        value = {
-                    "value": 0,
-                    "timestamp": "",
-                    "type": "",
-                    "last_consumptions": "",
-                    "time_window": ""
-        }
-        self.init_phase_handler.send_first_init_msg(value)
 
         self.consumption_same_time_window = []
 
