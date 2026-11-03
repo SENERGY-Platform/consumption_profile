@@ -96,7 +96,8 @@ class Operator(OperatorBase):
                 if dwdup.type_of_day(day) != day_type:
                     continue
                 for window_name, window in windows:
-                    if list(window)!=[]:
+                    # A window during which the clocks change lasts an hour more or less and is left out, as live.
+                    if list(window)!=[] and not dwdup.spans_clock_change(window.index[0], window.index[-1]):
                         overall_time_window_consumption = 1000*(window.iloc[-1]-window.iloc[0])
                         if overall_time_window_consumption>=0:
                             self.append_judged((day_type, window_name), window.index[-1], overall_time_window_consumption)
@@ -128,6 +129,15 @@ class Operator(OperatorBase):
             # restart, so its consumption would be too low. Only the windows after it are recorded.
             self.time_window_data_just_updated = False
             return
+        if dwdup.spans_clock_change(self.consumption_same_time_window[0]['Time'], self.consumption_same_time_window[-1]['Time']):
+            # The clocks changed during this window, so it lasted an hour more or less than on other days. It is left out,
+            # together with the part of it that an update right before recorded from the history.
+            if self.time_window_data_just_updated == True:
+                entries = self.time_window_consumption_list_dict[self.completed_window]
+                if entries and entries[-1][0] == self.consumption_same_time_window[0]['Time']:
+                    entries.pop()
+                self.time_window_data_just_updated = False
+            return
         time_window_consumption_max = float(self.consumption_same_time_window[-1]['Consumption'])
         time_window_consumption_min = float(self.consumption_same_time_window[0]['Consumption'])
         overall_time_window_consumption = 1000*(time_window_consumption_max-time_window_consumption_min)
@@ -149,7 +159,7 @@ class Operator(OperatorBase):
         # Convert to german time and then forget the timezone. The time windows are of the local
         # day; the output carries the UTC time, since the export reads it as UTC.
         utc = pd.Timestamp(timestamp).tz_convert("UTC")
-        self.timestamp = utc.tz_convert("Europe/Berlin").tz_localize(None)
+        self.timestamp = utc.tz_convert(dwdup.TIMEZONE).tz_localize(None)
         data = {'Consumption': data['Consumption'], 'Time': self.timestamp}
         if not self.first_data_time:
             self.first_data_time = self.timestamp

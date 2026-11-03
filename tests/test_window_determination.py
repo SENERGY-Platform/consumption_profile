@@ -89,6 +89,16 @@ class TestWindowDetermination(unittest.TestCase):
         self.assertNotEqual(dwdup.window_determination(history, DEFAULT_BOUNDARIES, "weekday"),
                             dwdup.window_determination(history, DEFAULT_BOUNDARIES, "weekend"))
 
+    def test_leaves_out_a_day_on_which_the_clocks_go_back(self):
+        # equal readings every 5 minutes of real time in local time, as the operator keeps them: of the hour
+        # that comes twice on October 25, 2026 only the first pass; the weekend before is the only other one
+        utc = pd.date_range("2026-10-22 22:00:30", "2026-10-26 23:00", freq="5min", tz="UTC")
+        meter = pd.Series(100 + 0.25 * np.arange(len(utc)), index=utc)
+        meter = meter[(utc < "2026-10-25 01:00") | (utc >= "2026-10-25 02:00")]
+        history = pd.Series(meter.to_numpy(), index=meter.index.tz_convert("Europe/Berlin").tz_localize(None))
+        # without the extra hour of that day in a single ten-minute slot the profile is flat
+        self.assertEqual(DEFAULT_BOUNDARIES, dwdup.window_determination(history, DEFAULT_BOUNDARIES, "weekend"))
+
     def test_finds_the_boundaries_of_a_month_with_partial_days_and_a_gap(self):
         history = meter("2026-03-02 07:23", 30)
         history = history.drop(history["2026-03-10 13:00":"2026-03-10 16:00"].index)

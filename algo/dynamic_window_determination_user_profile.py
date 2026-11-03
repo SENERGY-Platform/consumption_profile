@@ -17,6 +17,19 @@ DAY_TYPES = (WEEKDAY, WEEKEND)
 def type_of_day(day):
     return WEEKEND if day.weekday() >= 5 else WEEKDAY
 
+TIMEZONE = 'Europe/Berlin'
+# The time windows are of the local day, whose times are kept without their timezone.
+
+def spans_clock_change(start, end):
+    # Whether the clocks change between two local times, which makes the time between them an hour longer or shorter.
+    # Of the hour that comes twice in autumn only the first pass is kept, which is daylight saving time.
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    real = end.tz_localize(TIMEZONE, ambiguous=True) - start.tz_localize(TIMEZONE, ambiguous=True)
+    return real != end - start
+
+def has_clock_change(day):
+    return spans_clock_change(pd.Timestamp(day), pd.Timestamp(day) + pd.Timedelta(1, 'd'))
+
 def compute_ten_min_consumptions(data_series):
     slots = data_series.index.floor('10T')
     first = data_series.groupby(slots).head(1)
@@ -41,10 +54,10 @@ def window_determination(data_series, window_boundaries_times, day_type=None):
     # The pandas dataframe df has the days as indices and the 144 10min time slots in a day as columns. The entries are the consumption from the respective day in the
     # respective time slot.
 
-    if day_type is not None:
-        df = df[[type_of_day(day) == day_type for day in df.index]]
+    df = df[[(day_type is None or type_of_day(day) == day_type) and not has_clock_change(day) for day in df.index]]
     # Only the days of the given type count. They are selected only here, since the series without the other days would have
-    # gaps that the resampling fills with consumption.
+    # gaps that the resampling fills with consumption. A day on which the clocks change is left out: it puts an hour more or
+    # less into a single slot.
     if df.empty:
         return window_boundaries_times
 
