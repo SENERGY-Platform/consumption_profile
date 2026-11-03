@@ -19,6 +19,7 @@ import json
 import tempfile
 import unittest
 
+from fake_timescale import Timescale
 from main import CustomConfig, Operator
 
 UTC = datetime.timezone.utc
@@ -33,9 +34,10 @@ class TestClockChange(unittest.TestCase):
         self.operator = Operator()
         self.operator.produce = lambda value: None
         self.operator.data_path = self.dir.name
-        self.operator.init(None, None, None, None, None, None,
-                           config=CustomConfig({"init_phase_length": "2",
-                                                "init_phase_level": "d"}))
+        with Timescale().patched():
+            self.operator.init(None, None, None, None, None, None,
+                               config=CustomConfig({"init_phase_length": "2",
+                                                    "init_phase_level": "d"}))
 
     def tearDown(self):
         self.dir.cleanup()

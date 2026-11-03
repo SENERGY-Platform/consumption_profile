@@ -18,6 +18,8 @@ __all__ = ("Operator", )
 
 from operator_lib.util import OperatorBase, logger, InitPhase, todatetime, timestamp_to_str
 from operator_lib.util.persistence import save, load
+from operator_lib.util.config import MissingConfigValueError
+from operator_lib.util.helpers import provide_historic_frames_local, HistoryNeedsRayError
 import pandas as pd
 import numpy as np
 import os
@@ -76,16 +78,21 @@ class Operator(OperatorBase):
     outputs = ProfileOutputs
     # Where the state is kept, the volume of the deployment; not a config value, which a flow could change.
     data_path = "/opt/data"
-    # The time windows are determined from this much history; older values are dropped then.
+    # This much history is read at the start, and the time windows are determined from it; older values are dropped then.
     history_length = pd.Timedelta(90, 'd')
 
     def init(self,  *args, **kwargs):
         super().init(*args, **kwargs)
         if not os.path.exists(self.data_path):
             os.mkdir(self.data_path)
+        self.data_history = self.read_history()
         self.first_data_time = load(self.data_path, "first_data_time.pickle")
+        if not self.data_history.empty and (not self.first_data_time or self.data_history.index[0] < self.first_data_time):
+            # The initial phase counts from the first value of the history, so a history of its length ends it at once.
+            self.first_data_time = self.data_history.index[0]
+            save(self.data_path, "first_data_time.pickle", self.first_data_time)
 
-        self.time_window_data_just_updated = None
+        self.time_window_data_just_updated = False
 
 
 
@@ -97,13 +104,31 @@ class Operator(OperatorBase):
 
         self.consumption_same_time_window = []
 
-        # Both per type of day. Files of their own, since the earlier files hold other entries; without them the windows
-        # are rebuilt from the history on the first message.
-        self.window_boundaries = load(self.data_path, 'window_boundaries_by_day_type.pickle', default={day_type: [datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0),
-                                         datetime.time(18, 0), datetime.time(21, 0)] for day_type in dwdup.DAY_TYPES})
-        self.data_history = load(self.data_path, "data_history.pickle", default=pd.Series([], index=[],dtype=object))
+        # Both per type of day, and like everything derived from the history not kept: the first message after the
+        # initial phase rebuilds them from it, so they also hold the windows that passed while the operator was down.
+        self.window_boundaries = {day_type: [datetime.time(0, 0), datetime.time(3, 0), datetime.time(6, 0),  datetime.time(9, 0), datetime.time(12, 0), datetime.time(15, 0),
+                                  datetime.time(18, 0), datetime.time(21, 0)] for day_type in dwdup.DAY_TYPES}
         # (time, consumption, judgement) per (type of day, window).
-        self.time_window_consumption_list_dict = load(self.data_path, "time_window_consumptions_by_day_type.pickle", default=defaultdict(list))
+        self.time_window_consumption_list_dict = defaultdict(list)
+
+    def read_history(self):
+        # Timescale is the only source of the history: it is read at every start and extended live, so a restart or a
+        # new volume loses nothing. Any other failure of the read fails the start, and the platform starts it again.
+        no_history = pd.Series([], index=[], dtype=object)
+        try:
+            frames = provide_historic_frames_local(self.history_length)
+        except (HistoryNeedsRayError, MissingConfigValueError) as e:
+            logger.warning(f'Starting without history: {e}')
+            return no_history
+        if len(frames) != 1 or 'device_id' in frames[0].columns:
+            logger.warning('Starting without history: the consumption comes from more than one device')
+            return no_history
+        frame = frames[0].dropna(subset=['Consumption'])
+        # As live: German time without a timezone, and a value no later than every value before it is left out.
+        index = pd.DatetimeIndex(pd.to_datetime(frame['time'], utc=True)).tz_convert(dwdup.TIMEZONE).tz_localize(None)
+        history = pd.Series(frame['Consumption'].astype(float).to_numpy(), index=index)
+        latest_before = history.index.to_series().cummax().shift().fillna(pd.Timestamp.min)
+        return history[history.index > latest_before.to_numpy()]
 
     def create_new_time_window_consumption_list_dict(self):
         self.time_window_consumption_list_dict = defaultdict(list)
@@ -118,7 +143,6 @@ class Operator(OperatorBase):
                         overall_time_window_consumption = 1000*(window.iloc[-1]-window.iloc[0])
                         if overall_time_window_consumption>=0:
                             self.append_judged((day_type, window_name), window.index[-1], overall_time_window_consumption)
-        save(self.data_path, "time_window_consumptions_by_day_type.pickle", self.time_window_consumption_list_dict)
 
     def append_judged(self, window, time, consumption):
         entries = self.time_window_consumption_list_dict[window]
@@ -131,7 +155,6 @@ class Operator(OperatorBase):
         self.data_history = self.data_history[self.timestamp-self.history_length:]
         for day_type in dwdup.DAY_TYPES:
             self.window_boundaries[day_type] = dwdup.window_determination(self.data_history, self.window_boundaries[day_type], day_type)
-        save(self.data_path, 'window_boundaries_by_day_type.pickle', self.window_boundaries)
         self.create_new_time_window_consumption_list_dict()
 
     def update_time_window_consumption_list_dict(self):
@@ -140,11 +163,6 @@ class Operator(OperatorBase):
             pd.Timestamp(str(self.current_time_window_start))-pd.Timestamp(str(self.last_time_window_start)) > -21*pd.Timedelta(1,'h')
            ) 
         ):
-            return
-        if self.time_window_data_just_updated is None:
-            # init leaves the flag at None: after a restart this window lacks its values from before the
-            # restart, so its consumption would be too low. Only the windows after it are recorded.
-            self.time_window_data_just_updated = False
             return
         if dwdup.spans_clock_change(self.consumption_same_time_window[0]['Time'], self.consumption_same_time_window[-1]['Time']):
             # The clocks changed during this window, so it lasted an hour more or less than on other days. It is left out,
@@ -169,7 +187,6 @@ class Operator(OperatorBase):
                 _, consumption_before_update, _ = self.time_window_consumption_list_dict[self.completed_window].pop()
                 judged = self.append_judged(self.completed_window, self.timestamp, consumption_before_update+overall_time_window_consumption)
                 self.time_window_data_just_updated = False
-        save(self.data_path, "time_window_consumptions_by_day_type.pickle", self.time_window_consumption_list_dict)
         return judged
 
     def run(self, data: typing.Dict[str, typing.Any], selector: str, device_id, timestamp: datetime.datetime):
@@ -187,10 +204,7 @@ class Operator(OperatorBase):
         if len(self.data_history.index) >= 1 and self.timestamp <= self.data_history.index[-1]: # Discard points that come in wrong order wrt time.
             return
         self.data_history = pd.concat([self.data_history, pd.Series([float(data['Consumption'])], index=[self.timestamp])])
-        if len(self.data_history.index) < 2 or self.timestamp.floor('h') != self.data_history.index[-2].floor('h'):
-            # Once an hour and not only in stop, so that a crash loses at most the history of the current hour.
-            save(self.data_path, "data_history.pickle", self.data_history)
-        
+
         operator_is_init = self.init_phase_handler.operator_is_in_init_phase(self.timestamp)
         
         
@@ -257,11 +271,7 @@ class Operator(OperatorBase):
         if deviation is not None:
             output["deviation"] = round(deviation, 1)
         return output
-    
-    def stop(self):
-        super().stop()
-        save(self.data_path, "data_history.pickle", self.data_history)
-    
+
 from operator_lib.operator_lib import OperatorLib
 if __name__ == "__main__":
     OperatorLib(Operator(), name="user-profile-operator", git_info_file='git_commit')
