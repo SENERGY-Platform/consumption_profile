@@ -51,4 +51,4 @@ The consumption during a time window is compared with up to 14 earlier consumpti
 
 ## Further documentation
 
-[docs/](docs/) holds background that does not fit here, currently the open question of where the time windows should lie.
+[docs/](docs/) holds background that does not fit here, currently the measurement of where the time windows should lie.
