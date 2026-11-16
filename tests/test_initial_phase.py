@@ -70,6 +70,16 @@ class TestInitialPhase(unittest.TestCase):
         result = self.start().run({"Consumption": 100}, "", "device", datetime.datetime(2026, 6, 1, 10, 0, 30, tzinfo=CEST))
         self.assertEqual("", result["initial_phase"])
 
+    def test_the_initial_phase_sends_no_type(self):
+        # the notifier of the flow turns an empty type into a notification
+        result = self.start().run({"Consumption": 100}, "", "device", datetime.datetime(2026, 6, 1, 10, 0, 30, tzinfo=CEST))
+        self.assertNotIn("type", result)
+
+    def test_ending_the_initial_phase_sends_no_type(self):
+        self.history(datetime.datetime(2026, 5, 30, 10, 0, 30, tzinfo=CEST), datetime.datetime(2026, 6, 1, 10, 0, 30, tzinfo=CEST))
+        result = self.start().run({"Consumption": 100}, "", "device", datetime.datetime(2026, 6, 1, 10, 0, 30, tzinfo=CEST))
+        self.assertNotIn("type", result)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -209,10 +209,10 @@ class Operator(OperatorBase):
         
         
         
+        # No "type": the notifier of the flow sends any value it gets, an empty one included.
         init_value = {
                     "value": 0,
                     "timestamp": timestamp_to_str(utc),
-                    "type": "",
                     "last_consumptions": "",
                     "time_window": ""
         }
